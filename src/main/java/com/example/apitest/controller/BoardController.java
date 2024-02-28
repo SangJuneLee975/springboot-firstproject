@@ -113,5 +113,13 @@ public class BoardController {
         }
     }
 
+    @GetMapping("/paged")
+    public ResponseEntity<Page<Board>> getBoardsPaged(
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "5") int size) {
+        // 페이지 번호와 크기를 매개변수로 받아서 해당 페이지의 게시글 목록을 조회
+        Page<Board> boards = boardService.getBoardsPaged(page, size);
 
+        return ResponseEntity.ok(boards);
+    }
 }
