@@ -34,7 +34,7 @@ public class BoardController {
 
         this.userService = userService;
         this.boardService = boardService;
-        this.jwtUtils = jwtUtils; // JwtUtils 주입
+        this.jwtUtils = jwtUtils;
     }
 
     // 게시판 목록 조회

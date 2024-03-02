@@ -9,7 +9,7 @@ import java.util.List;
 @Service
 public class CommentServiceImpl implements CommentService {
 
-    private final CommentRepository commentRepository; // 댓글 관련 데이터 접근을 위한 리포지토리
+    private final CommentRepository commentRepository;
 
     @Autowired
     public CommentServiceImpl(CommentRepository commentRepository) {
