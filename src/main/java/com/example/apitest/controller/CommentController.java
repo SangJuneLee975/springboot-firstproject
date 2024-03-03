@@ -17,7 +17,7 @@ import java.util.List;
 @RequestMapping("/api/comments")
 public class CommentController {
 
-    private final JwtUtils jwtUtils; // JwtUtils 필드 추가
+    private final JwtUtils jwtUtils;
 
     private final CommentService commentService;
 
@@ -45,10 +45,43 @@ public class CommentController {
         String token = jwtUtils.extractToken(request);
         if (token != null && jwtUtils.validateToken(token)) {
             String userId = jwtUtils.extractUserId(token);
-            comment.setUserId(userId); // 토큰에서 추출한 userId 설정
+            comment.setUserId(userId);
             comment.setBoardId(boardId);
             commentService.addComment(comment);
             return ResponseEntity.status(HttpStatus.CREATED).build();
+        } else {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("인증 실패");
+        }
+    }
+
+    // 댓글 삭제
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteComment(@PathVariable Long id, HttpServletRequest request) {
+        String token = jwtUtils.extractToken(request);
+        if (token != null && jwtUtils.validateToken(token)) {
+            commentService.deleteComment(id);
+            return ResponseEntity.ok().build();
+        } else {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("인증 실패");
+        }
+    }
+
+    // 댓글 수정
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateComment(@PathVariable Long id, @RequestBody Comment comment, HttpServletRequest request) {
+        String token = jwtUtils.extractToken(request);
+        if (token != null && jwtUtils.validateToken(token)) {
+            String userId = jwtUtils.extractUserId(token);
+
+            if (comment.getUserId() == null || !comment.getUserId().equals(userId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("수정 권한 없음 또는 유효하지 않은 사용자 ID");
+            }
+
+            comment.setId(id);
+            commentService.updateComment(comment);
+            System.out.println("Token User ID: " + userId);
+            System.out.println("Comment User ID: " + comment.getUserId());
+            return ResponseEntity.ok().build();
         } else {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("인증 실패");
         }

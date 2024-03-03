@@ -40,4 +40,16 @@ public class JdbcCommentRepository implements CommentRepository {
         String sql = "INSERT INTO comment (content, user_id, board_id) VALUES (?, ?, ?)";
         jdbcTemplate.update(sql, comment.getContent(), comment.getUserId(), comment.getBoardId());
     }
+
+    @Override
+    public void deleteById(Long id) {
+        String sql = "DELETE FROM comment WHERE id = ?";
+        jdbcTemplate.update(sql, id);
+    }
+
+    @Override
+    public void update(Comment comment) {
+        String sql = "UPDATE comment SET content = ? WHERE id = ?";
+        jdbcTemplate.update(sql, comment.getContent(), comment.getId());
+    }
 }
