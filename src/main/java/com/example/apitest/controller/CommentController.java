@@ -68,22 +68,27 @@ public class CommentController {
 
     // 댓글 수정
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateComment(@PathVariable Long id, @RequestBody Comment comment, HttpServletRequest request) {
+    public ResponseEntity<?> updateComment(@PathVariable Long id, @RequestBody Comment updatedComment, HttpServletRequest request) {
         String token = jwtUtils.extractToken(request);
-        if (token != null && jwtUtils.validateToken(token)) {
-            String userId = jwtUtils.extractUserId(token);
-
-            if (comment.getUserId() == null || !comment.getUserId().equals(userId)) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("수정 권한 없음 또는 유효하지 않은 사용자 ID");
-            }
-
-            comment.setId(id);
-            commentService.updateComment(comment);
-            System.out.println("Token User ID: " + userId);
-            System.out.println("Comment User ID: " + comment.getUserId());
-            return ResponseEntity.ok().build();
-        } else {
+        if (token == null || !jwtUtils.validateToken(token)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("인증 실패");
         }
+
+        String userId = jwtUtils.extractUserId(token);
+        Comment existingComment = commentService.findById(id);
+
+        if (existingComment == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        if (!existingComment.getUserId().equals(userId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("수정 권한 없음");
+        }
+
+        updatedComment.setId(id);
+        commentService.updateComment(updatedComment);
+        return ResponseEntity.ok().build();
     }
+
+
 }

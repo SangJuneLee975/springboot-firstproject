@@ -9,4 +9,7 @@ public interface CommentService {
    public void deleteComment(Long id); // 댓글 삭제
    public void updateComment(Comment comment); // 댓글 수정
 
+   public Comment findById(Long id); // ID로 댓글 찾기
+
+
 }
