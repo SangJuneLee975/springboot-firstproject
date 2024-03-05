@@ -12,5 +12,7 @@ public interface CommentRepository {
 
    public Comment findById(Long id); // ID로 댓글 찾기
 
+   public List<Comment> findByParentId(Long parentId); // 부모 댓글에 대한 모든 대댓글 조회
+
 
 }

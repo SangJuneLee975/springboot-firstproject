@@ -6,6 +6,8 @@ import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
+
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -27,6 +29,8 @@ public class JdbcCommentRepository implements CommentRepository {
         comment.setUserId(rs.getString("user_id"));
         comment.setDate(rs.getTimestamp("date").toLocalDateTime());
         comment.setBoardId(rs.getLong("board_id"));
+        comment.setDepth(rs.getInt("depth"));
+        comment.setOrder(rs.getInt("comment_order"));
         return comment;
     };
 
@@ -39,9 +43,17 @@ public class JdbcCommentRepository implements CommentRepository {
     @Override
     public void create(Comment comment) {
 
-        String sql = "INSERT INTO comment (content, user_id, board_id) VALUES (?, ?, ?)";
-        jdbcTemplate.update(sql, comment.getContent(), comment.getUserId(), comment.getBoardId());
+        Integer newDepth = 0;      // parentId가 null이 아닌 경우 부모 댓글의 depth를 기반으로 새 depth
+        if (comment.getParentId() != null) {
+            String depthSql = "SELECT depth FROM comment WHERE id = ?";
+            Integer parentDepth = jdbcTemplate.queryForObject(depthSql, new Object[]{comment.getParentId()}, Integer.class);
+            newDepth = parentDepth != null ? parentDepth + 1 : newDepth;
+        }
+
+        String sql = "INSERT INTO comment (board_id, user_id, content, parent_id, depth, comment_order, date) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        jdbcTemplate.update(sql, comment.getBoardId(), comment.getUserId(), comment.getContent(), comment.getParentId(), newDepth, comment.getOrder(), Timestamp.valueOf(LocalDateTime.now()));
     }
+
 
     @Override
     public void deleteById(Long id) {
@@ -63,5 +75,11 @@ public class JdbcCommentRepository implements CommentRepository {
         } catch (EmptyResultDataAccessException e) {
             return null;
         }
+    }
+
+    @Override
+    public List<Comment> findByParentId(Long parentId) {
+        String sql = "SELECT * FROM comment WHERE parent_id = ?";
+        return jdbcTemplate.query(sql, new Object[]{parentId}, rowMapper);
     }
 }

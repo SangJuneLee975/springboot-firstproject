@@ -41,4 +41,8 @@ public class CommentServiceImpl implements CommentService {
         return commentRepository.findById(id);
     }
 
+    @Override
+    public List<Comment> getReplyByCommentId(Long commentId) {
+        return commentRepository.findByParentId(commentId);
+    }
 }

@@ -91,4 +91,34 @@ public class CommentController {
     }
 
 
+    // 대댓글 추가
+    @PostMapping("/{parentId}/reply")
+    public ResponseEntity<?> addReplyToComment(@PathVariable Long parentId, @RequestBody Comment replyComment, HttpServletRequest request) {
+        String token = jwtUtils.extractToken(request);
+        if (token != null && jwtUtils.validateToken(token)) {
+            String userId = jwtUtils.extractUserId(token);
+            replyComment.setUserId(userId);
+
+            Comment parentComment = commentService.findById(parentId);
+            if (parentComment == null) {
+                return ResponseEntity.notFound().build();
+            }
+            replyComment.setBoardId(parentComment.getBoardId());
+            replyComment.setParentId(parentId);
+            commentService.addComment(replyComment);
+            return ResponseEntity.status(HttpStatus.CREATED).build();
+        } else {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("인증 실패");
+        }
+    }
+
+    // 특정 댓글에 대한 모든 대댓글 조회
+    @GetMapping("/{commentId}/replies")
+    public ResponseEntity<List<Comment>> getRepliesByCommentId(@PathVariable Long commentId) {
+        List<Comment> replies = commentService.getReplyByCommentId(commentId);
+        if (replies.isEmpty()) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(replies);
+    }
 }

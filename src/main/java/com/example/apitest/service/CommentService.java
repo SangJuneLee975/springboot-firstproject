@@ -11,5 +11,6 @@ public interface CommentService {
 
    public Comment findById(Long id); // ID로 댓글 찾기
 
+   public List<Comment> getReplyByCommentId(Long commentId); // 댓글에 대한 모든 대댓글 조회
 
 }
