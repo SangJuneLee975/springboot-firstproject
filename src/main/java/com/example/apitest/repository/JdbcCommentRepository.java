@@ -27,6 +27,7 @@ public class JdbcCommentRepository implements CommentRepository {
         comment.setId(rs.getLong("id"));
         comment.setContent(rs.getString("content"));
         comment.setUserId(rs.getString("user_id"));
+        comment.setNickname(rs.getString("nickname"));
         comment.setDate(rs.getTimestamp("date").toLocalDateTime());
         comment.setBoardId(rs.getLong("board_id"));
         comment.setDepth(rs.getInt("depth"));
@@ -36,7 +37,7 @@ public class JdbcCommentRepository implements CommentRepository {
 
     @Override
     public List<Comment> findByBoardId(Long boardId) {
-        String sql = "SELECT * FROM comment WHERE board_id = ?";
+        String sql = "SELECT c.*, u.nickname FROM comment c JOIN user u ON c.user_id = u.userId WHERE c.board_id = ?";
         return jdbcTemplate.query(sql, new Object[]{boardId}, rowMapper);
     }
 
@@ -70,7 +71,7 @@ public class JdbcCommentRepository implements CommentRepository {
     @Override
     public Comment findById(Long id) {
         try {
-            String sql = "SELECT * FROM comment WHERE id = ?";
+            String sql = "SELECT c.*, u.nickname FROM comment c JOIN user u ON c.user_id = u.userId WHERE c.id = ?";
             return jdbcTemplate.queryForObject(sql, new Object[]{id}, rowMapper);
         } catch (EmptyResultDataAccessException e) {
             return null;
