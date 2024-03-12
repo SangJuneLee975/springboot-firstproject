@@ -17,6 +17,6 @@ public class Board {
     private String content;
     private String writer; // 작성자 필드 추가
     private LocalDateTime date; // 작성일 필드 추가
-
+    private Long categoryId; //카테고리ID
 
 }
