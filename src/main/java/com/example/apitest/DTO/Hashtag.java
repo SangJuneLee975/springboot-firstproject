@@ -7,7 +7,9 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class Category {
+public class Hashtag {
     private Long id;
-    private String name;
+    private String name; // 해시태그 이름
+
+
 }

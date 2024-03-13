@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class Category {
-    private Long id;
-    private String name;
+public class BoardHashtag {
+    private Long boardId;
+    private Long hashtagId;
 }

@@ -42,15 +42,15 @@ public class BoardServiceImpl implements BoardService {
     // 게시판 생성
     @Override
     public void createBoard(Board board) {
-        String sql = "INSERT INTO boards (title, content, writer, date) VALUES (?, ?, ?, ?)";
-        jdbcTemplate.update(sql, board.getTitle(), board.getContent(), board.getWriter(), LocalDateTime.now());
+        String sql = "INSERT INTO boards (title, content, writer, date, category_id) VALUES (?, ?, ?, ?, ?)";
+        jdbcTemplate.update(sql, board.getTitle(), board.getContent(), board.getWriter(), LocalDateTime.now(), board.getCategoryId());
     }
 
     // 게시판 수정
     @Override
     public void updateBoard(Board board) {
-        String sql = "UPDATE boards SET title = ?, content = ? WHERE id = ?";
-        jdbcTemplate.update(sql, board.getTitle(), board.getContent(), board.getId());
+        String sql = "UPDATE boards SET title = ?, content = ?, category_id = ? WHERE id = ?";
+        jdbcTemplate.update(sql, board.getTitle(), board.getContent(), board.getCategoryId(), board.getId());
     }
 
     // 게시판 글 삭제

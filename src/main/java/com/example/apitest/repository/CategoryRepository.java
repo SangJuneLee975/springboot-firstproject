@@ -1,10 +1,9 @@
 package com.example.apitest.repository;
 
 import com.example.apitest.DTO.Category;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
+import java.util.List;
 
-@Repository
-public interface CategoryRepository extends JpaRepository<Category, Long> {
-
+public interface CategoryRepository {
+    public List<Category> findAll();
+    // 기타 필요한 메소드 정의 가능
 }

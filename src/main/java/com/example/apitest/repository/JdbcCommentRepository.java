@@ -37,7 +37,10 @@ public class JdbcCommentRepository implements CommentRepository {
 
     @Override
     public List<Comment> findByBoardId(Long boardId) {
-        String sql = "SELECT c.*, u.nickname FROM comment c JOIN user u ON c.user_id = u.userId WHERE c.board_id = ?";
+        String sql = "SELECT c.*, u.nickname FROM comment c " +
+                "JOIN user u ON c.user_id = u.userId " +
+                "WHERE c.board_id = ? " +
+                "ORDER BY c.parent_id ASC, c.comment_order ASC, c.date ASC";
         return jdbcTemplate.query(sql, new Object[]{boardId}, rowMapper);
     }
 
@@ -45,14 +48,21 @@ public class JdbcCommentRepository implements CommentRepository {
     public void create(Comment comment) {
 
         Integer newDepth = 0;      // parentId가 null이 아닌 경우 부모 댓글의 depth를 기반으로 새 depth
+        Integer newOrder = 0; // 새로운 comment_order 값을 저장할 변수
         if (comment.getParentId() != null) {
             String depthSql = "SELECT depth FROM comment WHERE id = ?";
             Integer parentDepth = jdbcTemplate.queryForObject(depthSql, new Object[]{comment.getParentId()}, Integer.class);
             newDepth = parentDepth != null ? parentDepth + 1 : newDepth;
+
+            String orderSql = "SELECT MAX(comment_order) FROM comment WHERE parent_id = ?";
+            Integer maxOrder = jdbcTemplate.queryForObject(orderSql, new Object[]{comment.getParentId()}, Integer.class);
+            newOrder = maxOrder != null ? maxOrder + 1 : 0; // 최대값이 null이면 0으로 시작, 아니면 +1
         }
 
-        String sql = "INSERT INTO comment (board_id, user_id, content, parent_id, depth, comment_order, date) VALUES (?, ?, ?, ?, ?, ?, ?)";
-        jdbcTemplate.update(sql, comment.getBoardId(), comment.getUserId(), comment.getContent(), comment.getParentId(), newDepth, comment.getOrder(), Timestamp.valueOf(LocalDateTime.now()));
+        String sql = "INSERT INTO comment (board_id, user_id, content, parent_id, depth, comment_order, date) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?)";
+        jdbcTemplate.update(sql, comment.getBoardId(), comment.getUserId(), comment.getContent(),
+                comment.getParentId(), newDepth, newOrder, Timestamp.valueOf(LocalDateTime.now()));
     }
 
 
@@ -80,7 +90,7 @@ public class JdbcCommentRepository implements CommentRepository {
 
     @Override
     public List<Comment> findByParentId(Long parentId) {
-        String sql = "SELECT * FROM comment WHERE parent_id = ?";
+        String sql = "SELECT * FROM comment WHERE parent_id = ? ORDER BY date ASC";
         return jdbcTemplate.query(sql, new Object[]{parentId}, rowMapper);
     }
 }
