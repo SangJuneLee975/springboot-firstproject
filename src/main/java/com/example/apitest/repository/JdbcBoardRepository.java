@@ -46,4 +46,10 @@ public class JdbcBoardRepository implements BoardRepository {
         String sql = "DELETE FROM boards WHERE id = ?";
         jdbcTemplate.update(sql, id);
     }
+
+    // 게시글과 해시태그 연결 로직 구현
+    public void addHashtagToBoard(Long boardId, Long hashtagId) {
+        String sql = "INSERT INTO board_hashtag (board_id, hashtag_id) VALUES (?, ?)";
+        jdbcTemplate.update(sql, boardId, hashtagId);
+    }
 }

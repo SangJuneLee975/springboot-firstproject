@@ -10,4 +10,6 @@ public interface HashtagService {
     public Hashtag createHashtag(Hashtag hashtag);
     public void deleteHashtag(Long id);
     public Hashtag findHashtagByName(String name);
+
+    public List<Hashtag> findHashtagsByBoardId(Long boardId); //게시글 ID를 기반으로 해시태그를 조회
 }

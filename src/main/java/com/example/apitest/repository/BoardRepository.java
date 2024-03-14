@@ -19,4 +19,6 @@ public interface BoardRepository {
 
     // 게시판 삭제
     public void delete(Long id);
+
+    public void addHashtagToBoard(Long boardId, Long hashtagId);
 }

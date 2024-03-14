@@ -41,4 +41,11 @@ public class HashtagServiceImpl implements HashtagService {
     public Hashtag findHashtagByName(String name) {
         return hashtagRepository.findByName(name);
     }
+
+
+    @Override
+    public List<Hashtag> findHashtagsByBoardId(Long boardId) {
+      return hashtagRepository.findHashtagsByBoardId(boardId);
+    }
+
 }

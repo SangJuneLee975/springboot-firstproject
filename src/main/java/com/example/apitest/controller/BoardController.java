@@ -1,9 +1,11 @@
 package com.example.apitest.controller;
 
 import com.example.apitest.DTO.Board;
+import com.example.apitest.DTO.Hashtag;
 import com.example.apitest.DTO.User;
 import com.example.apitest.config.JwtUtils;
 import com.example.apitest.service.BoardService;
+import com.example.apitest.service.HashtagService;
 import com.example.apitest.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,13 +29,15 @@ public class BoardController {
 
     private final UserService userService;
     private final BoardService boardService;
+    private final HashtagService hashtagService;
     private final JwtUtils jwtUtils; // JwtUtils 필드 추가
 
     @Autowired
-    public BoardController(UserService userService, BoardService boardService, JwtUtils jwtUtils) {
+    public BoardController(UserService userService, BoardService boardService, JwtUtils jwtUtils, HashtagService hashtagService) {
 
         this.userService = userService;
         this.boardService = boardService;
+        this.hashtagService = hashtagService;
         this.jwtUtils = jwtUtils;
     }
 
@@ -59,14 +63,31 @@ public class BoardController {
             if (user != null) {
                 board.setWriter(user.getNickname()); // 게시글 작성자 설정
 
-                // 사용자 인증에 성공했으므로 게시글을 생성합니다.
-                boardService.createBoard(board);
-                return ResponseEntity.status(HttpStatus.CREATED).build();
+                // 게시글 정보 저장 (작성자, 내용 등)
+                Board createdBoard = boardService.createBoard(board);
+
+                // 해시태그 처리
+                if (board.getHashtags() != null && !board.getHashtags().isEmpty()) {
+                    for (Hashtag submittedHashtag : board.getHashtags()) {
+                        Hashtag existingHashtag = hashtagService.findHashtagByName(submittedHashtag.getName());
+                        if (existingHashtag == null) {
+                            // 새로운 해시태그면 생성
+                            existingHashtag = new Hashtag();
+                            existingHashtag.setName(submittedHashtag.getName());
+                            existingHashtag = hashtagService.createHashtag(existingHashtag);
+                        }
+                        // 게시글에 해시태그 연결
+                        boardService.addHashtagToBoard(createdBoard.getId(), existingHashtag.getId());
+                    }
+                }
+
+                return ResponseEntity.status(HttpStatus.CREATED).body(createdBoard);
             } else {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("사용자를 찾을 수 없습니다");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("사용자를 찾을 수 없습니다.");
             }
+        } else {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("토큰이 잘못되었거나 누락되었습니다.");
         }
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("토큰이 잘못되었거나 누락되었습니다..");
     }
 
 
