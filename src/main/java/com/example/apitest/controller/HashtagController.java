@@ -41,7 +41,7 @@ public class HashtagController {
             return ResponseEntity.notFound().build();
         }
         existingHashtag.setName(hashtag.getName());
-        Hashtag updatedHashtag = hashtagService.createHashtag(existingHashtag); // createHashtag 메서드를 재사용하거나, 필요에 따라 update 로직을 구현
+        Hashtag updatedHashtag = hashtagService.updateHashtag(id, existingHashtag);
         return ResponseEntity.ok(updatedHashtag);
     }
 

@@ -107,13 +107,55 @@ public class BoardController {
             // 게시글 정보 업데이트
             existingBoard.setTitle(updatedBoard.getTitle());
             existingBoard.setContent(updatedBoard.getContent());
+
+            // 기존의 게시글과 관련된 해시태그들을 제거
+            hashtagService.removeHashtagsFromBoard(id);
+
+            // 새 해시태그들을 게시글에 연결
+            if (updatedBoard.getHashtags() != null && !updatedBoard.getHashtags().isEmpty()) {
+                for (Hashtag hashtag : updatedBoard.getHashtags()) {
+                    Hashtag existingHashtag = hashtagService.findHashtagByName(hashtag.getName());
+                    if (existingHashtag == null) {
+                        // 새로운 해시태그이면 생성
+                        existingHashtag = hashtagService.createHashtag(new Hashtag(hashtag.getName()));
+                    }
+                    // 게시글에 해시태그 연결
+                    hashtagService.addHashtagToBoard(id, existingHashtag);
+                }
+            }
+
+            // 게시글 정보 저장
             boardService.updateBoard(existingBoard);
+
             return ResponseEntity.ok().body("게시글이 성공적으로 수정되었습니다.");
         } else {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("수정 권한이 없습니다.");
         }
     }
 
+
+    // 게시글 수정
+//    @PutMapping("/{id}")
+//    public ResponseEntity<?> updateBoard(@PathVariable Long id, @RequestBody Board updatedBoard, HttpServletRequest request) {
+//        String token = jwtUtils.extractToken(request);
+//        if (token == null || !jwtUtils.validateToken(token)) {
+//            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("승인되지 않음: 토큰이 잘못되었거나 누락되었습니다");
+//        }
+//
+//        String userId = jwtUtils.extractUserId(token);
+//        Board existingBoard = boardService.getBoardById(id);
+//
+//        // 요청한 사용자가 게시글 작성자와 동일한지 확인
+//        if (existingBoard != null && userService.findByUserId(userId).getNickname().equals(existingBoard.getWriter())) {
+//            // 게시글 정보 업데이트
+//            existingBoard.setTitle(updatedBoard.getTitle());
+//            existingBoard.setContent(updatedBoard.getContent());
+//            boardService.updateBoard(existingBoard);
+//            return ResponseEntity.ok().body("게시글이 성공적으로 수정되었습니다.");
+//        } else {
+//            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("수정 권한이 없습니다.");
+//        }
+//    }
     // 게시글 삭제
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteBoard(@PathVariable Long id, HttpServletRequest request) {
