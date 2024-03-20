@@ -26,4 +26,6 @@ public class Board {
     private Long categoryId; //카테고리ID
 
     private List<Hashtag> hashtags; // 해시태그 리스트 추가
+
+    private String ImageUrl;
 }

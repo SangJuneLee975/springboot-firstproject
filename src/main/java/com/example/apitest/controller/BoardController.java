@@ -1,5 +1,6 @@
 package com.example.apitest.controller;
 
+import com.example.apitest.service.S3Service;
 import com.example.apitest.DTO.Board;
 import com.example.apitest.DTO.Hashtag;
 import com.example.apitest.DTO.User;
@@ -15,12 +16,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/boards")
@@ -31,14 +31,16 @@ public class BoardController {
     private final BoardService boardService;
     private final HashtagService hashtagService;
     private final JwtUtils jwtUtils; // JwtUtils 필드 추가
+    private final S3Service s3Service;
 
     @Autowired
-    public BoardController(UserService userService, BoardService boardService, JwtUtils jwtUtils, HashtagService hashtagService) {
+    public BoardController(UserService userService, BoardService boardService, JwtUtils jwtUtils, HashtagService hashtagService, S3Service s3Service) {
 
         this.userService = userService;
         this.boardService = boardService;
         this.hashtagService = hashtagService;
         this.jwtUtils = jwtUtils;
+        this.s3Service = s3Service;
     }
 
     // 게시판 목록 조회
@@ -55,7 +57,10 @@ public class BoardController {
     }
 
     @PostMapping("/new")
-    public ResponseEntity<?> createBoard(@RequestBody Board board, HttpServletRequest request) {
+    public ResponseEntity<?> createBoard(
+            @RequestPart("board") Board board,
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            HttpServletRequest request) throws IOException {
         String token = jwtUtils.extractToken(request);
         if (token != null && jwtUtils.validateToken(token)) {
             String userId = jwtUtils.extractUserId(token);
@@ -63,7 +68,19 @@ public class BoardController {
             if (user != null) {
                 board.setWriter(user.getNickname()); // 게시글 작성자 설정
 
-                // 게시글 정보 저장 (작성자, 내용 등)
+                if (file != null && !file.isEmpty()) {
+                    // 이미지 파일이 있으면 S3에 업로드하고 URL을 받아옴
+                    ResponseEntity<?> uploadResponse = s3Service.upload(file, "board-images/" + UUID.randomUUID());
+                    if (uploadResponse.getStatusCode().is2xxSuccessful()) {
+                        String imageUrl = uploadResponse.getBody().toString(); // S3 업로드 후 반환된 이미지 URL
+                        board.setImageUrl(imageUrl); // Board 객체에 이미지 URL 설정
+                    } else {
+                        // 업로드 실패 처리
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("이미지 업로드 실패");
+                    }
+                }
+
+                // 게시글 정보 저장 (작성자, 내용, 이미지 URL 포함)
                 Board createdBoard = boardService.createBoard(board);
 
                 // 해시태그 처리
@@ -71,12 +88,10 @@ public class BoardController {
                     for (Hashtag submittedHashtag : board.getHashtags()) {
                         Hashtag existingHashtag = hashtagService.findHashtagByName(submittedHashtag.getName());
                         if (existingHashtag == null) {
-                            // 새로운 해시태그면 생성
                             existingHashtag = new Hashtag();
                             existingHashtag.setName(submittedHashtag.getName());
                             existingHashtag = hashtagService.createHashtag(existingHashtag);
                         }
-                        // 게시글에 해시태그 연결
                         boardService.addHashtagToBoard(createdBoard.getId(), existingHashtag.getId());
                     }
                 }
@@ -90,6 +105,42 @@ public class BoardController {
         }
     }
 
+
+//    @PostMapping("/new")
+//    public ResponseEntity<?> createBoard(@RequestBody Board board, HttpServletRequest request) {
+//        String token = jwtUtils.extractToken(request);
+//        if (token != null && jwtUtils.validateToken(token)) {
+//            String userId = jwtUtils.extractUserId(token);
+//            User user = userService.findByUserId(userId);
+//            if (user != null) {
+//                board.setWriter(user.getNickname()); // 게시글 작성자 설정
+//
+//                // 게시글 정보 저장 (작성자, 내용 등)
+//                Board createdBoard = boardService.createBoard(board);
+//
+//                // 해시태그 처리
+//                if (board.getHashtags() != null && !board.getHashtags().isEmpty()) {
+//                    for (Hashtag submittedHashtag : board.getHashtags()) {
+//                        Hashtag existingHashtag = hashtagService.findHashtagByName(submittedHashtag.getName());
+//                        if (existingHashtag == null) {
+//                            // 새로운 해시태그면 생성
+//                            existingHashtag = new Hashtag();
+//                            existingHashtag.setName(submittedHashtag.getName());
+//                            existingHashtag = hashtagService.createHashtag(existingHashtag);
+//                        }
+//                        // 게시글에 해시태그 연결
+//                        boardService.addHashtagToBoard(createdBoard.getId(), existingHashtag.getId());
+//                    }
+//                }
+//
+//                return ResponseEntity.status(HttpStatus.CREATED).body(createdBoard);
+//            } else {
+//                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("사용자를 찾을 수 없습니다.");
+//            }
+//        } else {
+//            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("토큰이 잘못되었거나 누락되었습니다.");
+//        }
+//    }
 
     // 게시글 수정
     @PutMapping("/{id}")

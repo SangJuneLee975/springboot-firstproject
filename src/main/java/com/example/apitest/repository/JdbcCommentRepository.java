@@ -35,15 +35,25 @@ public class JdbcCommentRepository implements CommentRepository {
         return comment;
     };
 
+    // 답글
     @Override
     public List<Comment> findByBoardId(Long boardId) {
         String sql = "SELECT c.*, u.nickname FROM comment c " +
                 "JOIN user u ON c.user_id = u.userId " +
                 "WHERE c.board_id = ? " +
-                "ORDER BY c.parent_id ASC, c.comment_order ASC, c.date ASC";
+                "ORDER BY " +
+                "CASE WHEN c.parent_id IS NULL THEN c.id ELSE c.parent_id END, " +
+                "c.depth ASC, " +
+                "c.comment_order ASC, " +
+                "c.date ASC";
         return jdbcTemplate.query(sql, new Object[]{boardId}, rowMapper);
     }
 
+
+//    String sql = "SELECT c.*, u.nickname FROM comment c " +
+//            "JOIN user u ON c.user_id = u.userId " +
+//            "WHERE c.board_id = ? " +
+//            "ORDER BY c.parent_id ASC, c.comment_order ASC, c.date ASC";
     @Override
     public void create(Comment comment) {
 
