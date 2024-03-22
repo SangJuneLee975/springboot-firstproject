@@ -1,4 +1,3 @@
-# JPA
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -14,7 +13,23 @@ spring:
     properties:
       hibernate:
         format_sql: true
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
 
+jwt:
+  secret: mySecretKey123!
 
-    jwt:
-      secret=mySecretKey123!:
+cloud:
+  aws:
+    region:
+      static: ap-northeast-2
+    s3:
+      bucket: testbucket975
+    stack:
+      auto: false
+    credentials:
+      access-key:
+      secret-key:
+

@@ -27,5 +27,5 @@ public class Board {
 
     private List<Hashtag> hashtags; // 해시태그 리스트 추가
 
-    private String ImageUrl;
+    private List<String> imageUrls; // 이미지 URL을 저장
 }
