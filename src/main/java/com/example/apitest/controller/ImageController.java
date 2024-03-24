@@ -19,7 +19,7 @@ public class ImageController {
     public ResponseEntity<String> uploadFile(@RequestParam("file") MultipartFile file) {
         try {
             String fileUrl = s3Service.uploadFileToS3(file);
-            return ResponseEntity.ok(fileUrl); // 직접 파일 URL을 반환
+            return ResponseEntity.ok(fileUrl);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("파일 업로드 중 에러가 발생했습니다: " + e.getMessage());
         }

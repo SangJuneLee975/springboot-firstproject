@@ -33,3 +33,7 @@ cloud:
       access-key:
       secret-key:
 
+logging:
+  level:
+    root: INFO
+    com.example.apitest: DEBUG

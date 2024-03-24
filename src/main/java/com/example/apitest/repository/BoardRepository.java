@@ -12,7 +12,7 @@ public interface BoardRepository {
     public Board findById(Long id);
 
     // 게시판 생성
-    public void create(Board board);
+    public Long create(Board board);
 
     // 게시판 수정
     public void update(Board board);
@@ -21,4 +21,6 @@ public interface BoardRepository {
     public void delete(Long id);
 
     public void addHashtagToBoard(Long boardId, Long hashtagId);
+
+    public void saveImageUrls(List<String> imageUrls, Long boardId); //이미지를 업로드하고 반환받은 URL을 DB에 저장하는 로직
 }

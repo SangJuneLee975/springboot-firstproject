@@ -2,6 +2,7 @@ package com.example.apitest.DTO;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import jakarta.persistence.ElementCollection;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -27,5 +28,9 @@ public class Board {
 
     private List<Hashtag> hashtags; // 해시태그 리스트 추가
 
-    private List<String> imageUrls; // 이미지 URL을 저장
+
+    private List<String> imageUrls; // 이미지 URL 목록 추가
+
+
+
 }
