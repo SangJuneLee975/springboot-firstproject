@@ -4,10 +4,12 @@ import com.example.apitest.DTO.Board;
 import com.example.apitest.DTO.Hashtag;
 import com.example.apitest.repository.BoardRepository;
 import com.example.apitest.repository.ImageRepository;
+import com.example.apitest.util.JsonUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -69,15 +71,10 @@ public class BoardServiceImpl implements BoardService {
         });
     }
 
-        @Override
+    @Override
     public Board getBoardById(Long id) {
-            Board board = boardRepository.findById(id);
-            if (board != null) {
-                List<String> imageUrls = imageRepository.findImageUrlsByBoardId(board.getId());
-                board.setImageUrls(imageUrls);
-            }
-            return board;
-        }
+        return boardRepository.findById(id);
+    }
 
  //   @Override
  //   public Board findById(Long id) {
@@ -110,47 +107,51 @@ public class BoardServiceImpl implements BoardService {
     // 게시판 생성
     @Override
     public Board createBoard(Board board, List<MultipartFile> multipartFiles) throws IOException {
-
-        // 파일 URL 리스트를 세미콜론으로 구분된 하나의 문자열로 변환
-
         KeyHolder keyHolder = new GeneratedKeyHolder();
-        String sql = "INSERT INTO boards (title, content, writer, date, category_id) VALUES (?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO boards (title, content, writer, date, category_id, image_urls) VALUES (?, ?, ?, ?, ?, ?)";
 
-        jdbcTemplate.update(connection -> {
-            PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
-            ps.setString(1, board.getTitle());
-            ps.setString(2, board.getContent());
-            ps.setString(3, board.getWriter());
-            ps.setTimestamp(4, Timestamp.valueOf(LocalDateTime.now()));
-            ps.setLong(5, board.getCategoryId());
-            return ps;
-        }, keyHolder);
-
-        // 새로 생성된 게시글 ID를 Board 객체에 설정
-        board.setId(keyHolder.getKey().longValue());
-
-        // 해시태그 연결 로직 호출 가능
-        if (board.getHashtags() != null) {
-            for (Hashtag hashtag : board.getHashtags()) {
-                // 해시태그 처리 로직 (생략)
-            }
-        }
-
-        Long boardId = boardRepository.create(board);
-        logger.info("Board created with ID: {}", boardId);
-
-        if (multipartFiles != null && !multipartFiles.isEmpty()) {
+        try {
             List<String> imageUrls = new ArrayList<>();
-            for (MultipartFile file : multipartFiles) {
-                String imageUrl = awsS3Service.uploadFileToS3(file);
-                imageUrls.add(imageUrl);
-                logger.info("Image uploaded with URL: {}", imageUrl);
+            if (multipartFiles != null && !multipartFiles.isEmpty()) {
+                // 이미지 파일들을 S3에 업로드하고, URL을 리스트로 수집
+                for (MultipartFile file : multipartFiles) {
+                    if (!file.isEmpty()) {
+                        String imageUrl = awsS3Service.uploadFileToS3(file);
+                        if (imageUrl != null && !imageUrl.isEmpty()) {
+                            imageUrls.add(imageUrl);
+                        } else {
+                            // 파일 업로드 실패 처리
+                            logger.error("Failed to upload file to S3: {}", file.getOriginalFilename());
+                            // 필요한 경우, 사용자에게 오류를 알리는 로직 추가
+                        }
+                    }
+                }
             }
-            boardRepository.saveImageUrls(imageUrls, boardId);
-            logger.info("Image URLs saved for board ID: {}", boardId);
-        }
 
-        return board;
+            // imageUrls 리스트를 JSON 문자열로 변환, 리스트가 비어있다면 기본값으로 빈 배열의 JSON 문자열을 사용
+          //  String imageUrlsJson = imageUrls.isEmpty() ? "[]" : JsonUtil.listToJson(imageUrls);
+            String imageUrlsJson = JsonUtil.listToJson(board.getImageUrls()); // imageUrls를 JSON으로 변환
+            jdbcTemplate.update(connection -> {
+                PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+                ps.setString(1, board.getTitle());
+                ps.setString(2, board.getContent());
+                ps.setString(3, board.getWriter());
+                ps.setTimestamp(4, Timestamp.valueOf(LocalDateTime.now()));
+                ps.setLong(5, board.getCategoryId());
+                ps.setString(6, imageUrlsJson); // JSON 문자열 저장
+                return ps;
+            }, keyHolder);
+
+            // 새로 생성된 게시글 ID를 Board 객체에 설정
+            Long boardId = keyHolder.getKey().longValue();
+            board.setId(boardId);
+            board.setImageUrls(imageUrls); // 이미지 URL 리스트 설정
+
+            return board;
+        } catch (DataAccessException | IOException e) {
+            logger.error("Error creating board: {}", e.getMessage(), e);
+            throw new RuntimeException("게시글 생성 중 문제가 발생했습니다.", e);
+        }
     }
 
 

@@ -82,14 +82,6 @@ public class BoardController {
         // 파일 리스트를 MultipartFile 리스트로 변환
         List<MultipartFile> multipartFiles = files != null ? Arrays.asList(files) : new ArrayList<>();
 
-        // AWS S3에 파일 업로드 및 업로드된 파일 URL 저장
-        List<String> imageUrls = new ArrayList<>();
-        if (!multipartFiles.isEmpty()) {
-            for (MultipartFile file : multipartFiles) {
-                String imageUrl = awsS3Service.uploadFileToS3(file);
-                imageUrls.add(imageUrl);
-            }
-        }
 
 
         // 게시글 정보와 파일 리스트를 함께 저장

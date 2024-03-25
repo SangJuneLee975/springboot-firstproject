@@ -1,14 +1,20 @@
 package com.example.apitest.repository;
 
 import com.example.apitest.DTO.Board;
+import com.example.apitest.util.JsonUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
+import com.example.apitest.util.JsonUtil;
 import java.sql.*;
 import java.util.Arrays;
 import java.util.List;
@@ -22,6 +28,8 @@ import java.util.Arrays;
 @Repository
 public class JdbcBoardRepository implements BoardRepository {
     private final JdbcTemplate jdbcTemplate;
+
+    private static final Logger logger = LoggerFactory.getLogger(JdbcBoardRepository.class);
 
     @Autowired
     public JdbcBoardRepository(JdbcTemplate jdbcTemplate) {
@@ -47,20 +55,9 @@ public class JdbcBoardRepository implements BoardRepository {
 
 
     @Override
-    public Long create(Board board) {
-        final String sql = "INSERT INTO boards (title, content, writer, date, category_id) VALUES (?, ?, ?, NOW(), ?)";
-        KeyHolder keyHolder = new GeneratedKeyHolder();
-
-        jdbcTemplate.update(connection -> {
-            PreparedStatement ps = connection.prepareStatement(sql, new String[] {"id"}); // "id"는 자동 생성된 키의 컬럼명
-            ps.setString(1, board.getTitle());
-            ps.setString(2, board.getContent());
-            ps.setString(3, board.getWriter());
-            ps.setLong(4, board.getCategoryId());
-            return ps;
-        }, keyHolder);
-
-        return keyHolder.getKey().longValue(); // 생성된 게시글 ID 반환
+    public void create(Board board) {
+        String sql = "INSERT INTO boards (title, content) VALUES (?, ?)";
+        jdbcTemplate.update(sql, board.getTitle(), board.getContent());
     }
 
 
@@ -87,8 +84,12 @@ public class JdbcBoardRepository implements BoardRepository {
     public void saveImageUrls(List<String> imageUrls, Long boardId) {
         String sql = "INSERT INTO images (image_url, board_id) VALUES (?, ?)";
         for (String imageUrl : imageUrls) {
-            jdbcTemplate.update(sql, imageUrl, boardId);
+            try {
+                jdbcTemplate.update(sql, imageUrl, boardId);
+            } catch (DataAccessException e) {
+                logger.error("Cannot save image url: {}", imageUrl, e);
+                throw new RuntimeException("이미지 URL 저장 중 문제가 발생했습니다.", e);
+            }
         }
-
     }
 }

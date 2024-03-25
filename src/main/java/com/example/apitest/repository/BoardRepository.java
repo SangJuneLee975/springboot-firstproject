@@ -12,7 +12,7 @@ public interface BoardRepository {
     public Board findById(Long id);
 
     // 게시판 생성
-    public Long create(Board board);
+    public void create(Board board);
 
     // 게시판 수정
     public void update(Board board);

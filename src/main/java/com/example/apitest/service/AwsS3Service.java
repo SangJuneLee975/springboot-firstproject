@@ -48,8 +48,27 @@ public class AwsS3Service {
     private static final Logger logger = LoggerFactory.getLogger(AwsS3Service.class);
 
 
+
+    // 여러 파일을 S3에 업로드하고, 업로드된 파일의 URL 목록을 반환하는 메서드
+    public List<String> uploadMultipleFiles(List<MultipartFile> multipartFiles) {
+        List<String> fileUrls = new ArrayList<>();
+        for (MultipartFile file : multipartFiles) {
+            try {
+                // 기존의 단일 파일 업로드 메서드를 사용하여 파일을 업로드하고 URL을 받아옴
+                String fileUrl = uploadFileToS3(file);
+                fileUrls.add(fileUrl);
+            } catch (IOException e) {
+                logger.error("Error uploading file to S3: {}", file.getOriginalFilename(), e);
+                // 실패한 파일에 대한 처리를 여기에서 할 수 있습니다. 예를 들면, 다시 시도할 수도 있습니다.
+            }
+        }
+        return fileUrls; // 업로드된 파일 URL들의 목록 반환
+    }
+
+
     // 파일 S3 버킷에 업로드 하는 메소드
     // 파일 S3 버킷에 업로드하는 메소드 및 업로드된 파일 URL을 DB에 저장
+
     public String uploadFileToS3(MultipartFile multipartFile) throws IOException {
         if (multipartFile.isEmpty()) {
             throw new IOException("업로드할 파일이 비어 있습니다.");

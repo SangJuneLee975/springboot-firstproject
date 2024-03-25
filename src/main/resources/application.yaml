@@ -36,4 +36,4 @@ cloud:
 logging:
   level:
     root: INFO
-    com.example.apitest: DEBUG
+    com.example.apitest: INFO
