@@ -1,6 +1,9 @@
 package com.example.apitest.repository;
 
 import com.example.apitest.DTO.Image;
+import com.example.apitest.service.BoardServiceImpl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -18,6 +21,8 @@ import java.util.List;
 public class JdbcImageRepository implements ImageRepository {
 
     private final JdbcTemplate jdbcTemplate;
+
+    private static final Logger logger = LoggerFactory.getLogger(JdbcImageRepository.class);
 
     @Autowired
     public JdbcImageRepository(JdbcTemplate jdbcTemplate) {
@@ -47,7 +52,7 @@ public class JdbcImageRepository implements ImageRepository {
             return ps;
         }, keyHolder);
 
-        // 데이터베이스의 ID 컬럼이 'id'라고 가정
+
         Number key = keyHolder.getKey();
         if (key != null) {
             image.setId(key.longValue());
@@ -72,8 +77,18 @@ public class JdbcImageRepository implements ImageRepository {
     public void saveImageUrls(List<String> imageUrls, Long boardId) {
         String sql = "INSERT INTO images (image_url, board_id) VALUES (?, ?)";
         for (String imageUrl : imageUrls) {
-            jdbcTemplate.update(sql, imageUrl, boardId);
+            int update = jdbcTemplate.update(sql, imageUrl, boardId);
+            if (update > 0) {
+                logger.info("Image URL saved successfully: {}", imageUrl);
+            } else {
+                logger.error("Failed to save image URL: {}", imageUrl);
+            }
         }
+    }
+
+    @Override
+    public void deleteByImageUrl(String imageUrl) {
+        jdbcTemplate.update("DELETE FROM images WHERE image_url = ?", imageUrl);
     }
 
     @Override

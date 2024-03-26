@@ -66,7 +66,7 @@ public class AwsS3Service {
     }
 
 
-    // 파일 S3 버킷에 업로드 하는 메소드
+
     // 파일 S3 버킷에 업로드하는 메소드 및 업로드된 파일 URL을 DB에 저장
 
     public String uploadFileToS3(MultipartFile multipartFile) throws IOException {
@@ -93,6 +93,21 @@ public class AwsS3Service {
             throw e;
         } catch (IOException e) {
             logger.error("File IO error: {}", e.getMessage());
+            throw e;
+        }
+    }
+
+    // S3 버킷에서 특정 파일을 삭제하는 메소드
+    public void deleteFileFromS3(String fileUrl) throws AmazonServiceException {
+        // fileUrl에서 파일의 키를 추출합니다.
+        String fileKey = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+
+        try {
+            // S3 버킷에서 파일 삭제 요청
+            amazonS3Client.deleteObject(new DeleteObjectRequest(bucketName, fileKey));
+            logger.info("File deleted successfully from S3: {}", fileKey);
+        } catch (AmazonServiceException e) {
+            logger.error("Error deleting file from S3: {}", e.getMessage());
             throw e;
         }
     }
@@ -127,87 +142,6 @@ public class AwsS3Service {
 }
 
 
-
-
-//    // S3에 파일을 업로드하고 파일 URL을 반환하는 메서드
-//    private String uploadToS3(MultipartFile multipartFile, String filePath) throws IOException {
-//        ObjectMetadata metadata = new ObjectMetadata();
-//        metadata.setContentType(multipartFile.getContentType());
-//        metadata.setContentLength(multipartFile.getSize());
-//
-//        try (InputStream inputStream = multipartFile.getInputStream()) {
-//            amazonS3Client.putObject(new PutObjectRequest(bucketName, filePath, inputStream, metadata).withCannedAcl(CannedAccessControlList.PublicRead));
-//            return amazonS3Client.getUrl(bucketName, filePath).toString();
-//        } catch (AmazonServiceException e) {
-//            // AWS 서비스 오류 발생 시 로그 남기기
-//            logger.error("AWS 서비스 오류: {}", e.getMessage());
-//            throw e;
-//        } catch (IOException e) {
-//            // 파일 입출력 오류 발생 시 로그 남기기
-//            logger.error("파일 입출력 오류: {}", e.getMessage());
-//            throw e;
-//        }
-//    }
-
-
-//    // 파일 S3 버킷에 업로드 하는 메소드
-//    public String uploadFileToS3(MultipartFile multipartFile) throws IOException {
-//        if (multipartFile.isEmpty()) {
-//            throw new IOException("업로드할 파일이 비어 있습니다.");
-//        }
-//
-//        String key = System.currentTimeMillis() + "_" + multipartFile.getOriginalFilename();
-//        ObjectMetadata metadata = new ObjectMetadata();
-//        metadata.setContentType(multipartFile.getContentType());
-//        metadata.setContentLength(multipartFile.getSize());
-//
-//        // 파일 업로드 시작 로깅
-//        logger.info("Uploading file to S3: {}", key);
-//
-//        try (InputStream inputStream = multipartFile.getInputStream()) {
-//
-//            amazonS3Client.putObject(bucketName, key, inputStream, metadata);
-//
-//            String fileUrl = amazonS3Client.getUrl(bucketName, key).toString();
-//            logger.info("File uploaded successfully to S3. URL: {}", fileUrl);
-//
-//            return fileUrl;
-//        } catch (Exception e) {
-//            // 파일 업로드 실패 로깅
-//            logger.error("Error uploading file to S3: {}", e.getMessage());
-//            throw e;
-//        }
-//    }
-
-
-
-
-
-
-//
-//    // S3 객체의 URL을 가져오는 메소드
-//    public String getUrl(String bucket, String fileName) {
-//        return amazonS3Client.getUrl(bucket, fileName).toString();
-//    }
-//
-//    //S3폴더 내 파일 리스트 전달
-//    public List<String> listFiles(String folderKey) {
-//        List<String> fileUrls = new ArrayList<>();
-//        ListObjectsV2Request req = new ListObjectsV2Request().withBucketName(bucketName).withPrefix(folderKey+"/");
-//        ListObjectsV2Result result;
-//
-//        do {
-//            result = amazonS3Client.listObjectsV2(req);
-//
-//            for (S3ObjectSummary objectSummary : result.getObjectSummaries()) {
-//                String fileUrl = getUrl(bucketName, objectSummary.getKey());
-//                fileUrls.add(fileUrl);
-//            }
-//            req.setContinuationToken(result.getNextContinuationToken());
-//        } while (result.isTruncated());
-//
-//        return fileUrls;
-//    }
 
 
 

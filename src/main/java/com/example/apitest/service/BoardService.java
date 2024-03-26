@@ -18,6 +18,8 @@ public interface BoardService {
 
  public Page<Board> getBoardsPaged(int page, int size);
 
+ public void deleteImage(String imageUrl) throws Exception;
+
  public void addHashtagToBoard(Long boardId, Long hashtagId); // 게시글과 해시태그 관계
 
 

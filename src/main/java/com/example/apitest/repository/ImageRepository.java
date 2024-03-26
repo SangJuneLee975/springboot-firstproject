@@ -16,6 +16,8 @@ public interface ImageRepository {
 
    public void saveImageUrls(List<String> imageUrls, Long boardId);
 
+   public void deleteByImageUrl(String imageUrl); //데이터베이스에서 이미지 정보를 삭제하는 메서드
+
    // 게시글 ID로 연결된 이미지 URL 조회
    public List<String> findImageUrlsByBoardId(Long boardId);
 }

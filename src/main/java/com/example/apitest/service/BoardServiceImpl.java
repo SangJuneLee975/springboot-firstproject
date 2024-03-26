@@ -76,33 +76,6 @@ public class BoardServiceImpl implements BoardService {
         return boardRepository.findById(id);
     }
 
- //   @Override
- //   public Board findById(Long id) {
- //       String sql = "SELECT * FROM boards WHERE id = ?";
- //       Board board = jdbcTemplate.queryForObject(sql, new Object[]{id}, new BeanPropertyRowMapper<>(Board.class));
-  //      if (board != null) {
-   //         List<String> imageUrls = jdbcTemplate.query("SELECT image_url FROM images WHERE board_id = ?",
-    //                new Object[]{id}, (rs, rowNum) -> rs.getString("image_url"));
-    //        board.setImageUrls(imageUrls);
-    //    }
-    //    return board;
-  //  }
-
-
-//    @Override
-//    public Board getBoardById(Long id) {
-//        return boardRepository.findById(id);
-//    }
-
- //   @Override
-  //  public List<String> getImageUrlsByBoardId(Long boardId) {
-  //      Board board = boardRepository.findById(boardId);
- //       if (board != null && board.getImageUrls() != null) {
- //           return board.getImageUrls();
-////        }
-//        return new ArrayList<>();
-//    }
-
 
     // 게시판 생성
     @Override
@@ -119,6 +92,7 @@ public class BoardServiceImpl implements BoardService {
                         String imageUrl = awsS3Service.uploadFileToS3(file);
                         if (imageUrl != null && !imageUrl.isEmpty()) {
                             imageUrls.add(imageUrl);
+                            logger.info("Image uploaded to S3 and URL added to list: {}", imageUrl);
                         } else {
                             // 파일 업로드 실패 처리
                             logger.error("Failed to upload file to S3: {}", file.getOriginalFilename());
@@ -147,8 +121,17 @@ public class BoardServiceImpl implements BoardService {
             board.setId(boardId);
             board.setImageUrls(imageUrls); // 이미지 URL 리스트 설정
 
+            // images 테이블에 이미지 URL들 저장
+            if (!imageUrls.isEmpty()) {
+                logger.info("Saving image URLs to the images table for boardId: {}", boardId);
+                imageRepository.saveImageUrls(imageUrls, boardId);
+            }
+
+
             return board;
+
         } catch (DataAccessException | IOException e) {
+
             logger.error("Error creating board: {}", e.getMessage(), e);
             throw new RuntimeException("게시글 생성 중 문제가 발생했습니다.", e);
         }
@@ -174,9 +157,36 @@ public class BoardServiceImpl implements BoardService {
     // 게시판 글 삭제
     @Override
     public void deleteBoard(Long id) {
-        String sql = "DELETE FROM boards WHERE id = ?";
-        jdbcTemplate.update(sql, id);
+        // 게시글에 연결된 이미지 URL들을 조회
+        Board board = getBoardById(id);
+        if (board != null) {
+            List<String> imageUrls = board.getImageUrls();
+            if (imageUrls != null) {
+                for (String imageUrl : imageUrls) {
+                    // S3 버킷에서 이미지 삭제
+                    awsS3Service.deleteFileFromS3(imageUrl);
+                }
+            }
+            // DB에서 게시글 삭제
+            String sql = "DELETE FROM boards WHERE id = ?";
+            jdbcTemplate.update(sql, id);
+        }
     }
+
+    @Override
+    public void deleteImage(String imageUrl) throws Exception {
+        try {
+            // S3에서 이미지 파일 삭제
+            awsS3Service.deleteFileFromS3(imageUrl);
+
+            // DB에서 이미지 정보 삭제
+            imageRepository.deleteByImageUrl(imageUrl);
+        } catch (Exception e) {
+            logger.error("Error deleting image: {}", e.getMessage(), e);
+            throw new Exception("이미지 삭제 중 오류가 발생했습니다.");
+        }
+    }
+
 
     // 게시글 페이징 처리
     @Override

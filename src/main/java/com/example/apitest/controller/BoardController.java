@@ -107,11 +107,17 @@ public class BoardController {
 
     // 게시글 수정
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateBoard(@PathVariable Long id, @RequestBody Board updatedBoard, HttpServletRequest request) {
+    public ResponseEntity<?> updateBoard(
+            @PathVariable Long id,
+            @RequestPart("board") Board updatedBoard,
+            @RequestParam(value = "file", required = false) MultipartFile[] files,
+            HttpServletRequest request) {
+
         String token = jwtUtils.extractToken(request);
         if (token == null || !jwtUtils.validateToken(token)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("승인되지 않음: 토큰이 잘못되었거나 누락되었습니다");
         }
+
 
         String userId = jwtUtils.extractUserId(token);
         Board existingBoard = boardService.getBoardById(id);
@@ -137,6 +143,8 @@ public class BoardController {
                     hashtagService.addHashtagToBoard(id, existingHashtag);
                 }
             }
+
+            //파일 로직 추가 필요
 
             // 게시글 정보 저장
             boardService.updateBoard(existingBoard);
@@ -166,6 +174,21 @@ public class BoardController {
             return ResponseEntity.ok().body("게시글이 성공적으로 삭제되었습니다.");
         } else {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("삭제 권한이 없습니다.");
+        }
+    }
+
+    @DeleteMapping("/images")
+    public ResponseEntity<?> deleteImage(@RequestParam String imageUrl, HttpServletRequest request) {
+        try {
+            String token = jwtUtils.extractToken(request);
+            if (token == null || !jwtUtils.validateToken(token)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("인증되지 않은 사용자입니다.");
+            }
+
+            boardService.deleteImage(imageUrl);
+            return ResponseEntity.ok().body("이미지가 성공적으로 삭제되었습니다.");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("이미지 삭제 중 오류가 발생했습니다.");
         }
     }
 
