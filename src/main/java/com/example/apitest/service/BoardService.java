@@ -22,5 +22,8 @@ public interface BoardService {
 
  public void addHashtagToBoard(Long boardId, Long hashtagId); // 게시글과 해시태그 관계
 
+ public void removeImageUrlFromBoard(Long boardId, String imageUrl) throws Exception; // 게시글에서 이미지 url삭제
+
+ public void updateBoardImageUrls(Long boardId, String imageUrlsJson);// 게시글에서 이미지 업데이트
 
 }

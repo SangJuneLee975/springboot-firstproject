@@ -104,7 +104,12 @@ public class BoardServiceImpl implements BoardService {
 
             // imageUrls 리스트를 JSON 문자열로 변환, 리스트가 비어있다면 기본값으로 빈 배열의 JSON 문자열을 사용
           //  String imageUrlsJson = imageUrls.isEmpty() ? "[]" : JsonUtil.listToJson(imageUrls);
+
             String imageUrlsJson = JsonUtil.listToJson(board.getImageUrls()); // imageUrls를 JSON으로 변환
+
+          //  String imageUrlsJson = objectMapper.writeValueAsString(imageUrls);
+
+
             jdbcTemplate.update(connection -> {
                 PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
                 ps.setString(1, board.getTitle());
@@ -138,14 +143,6 @@ public class BoardServiceImpl implements BoardService {
     }
 
 
-//    // 게시판 생성
-//    @Override
-//    public Board createBoard(Board board) {
-//        String sql = "INSERT INTO boards (title, content, writer, date, category_id) VALUES (?, ?, ?, ?, ?)";
-//        jdbcTemplate.update(sql, board.getTitle(), board.getContent(), board.getWriter(), LocalDateTime.now(), board.getCategoryId());
-//
-//        return board;
-//    }
 
     // 게시판 수정
     @Override
@@ -217,14 +214,43 @@ public class BoardServiceImpl implements BoardService {
         boardRepository.addHashtagToBoard(boardId, hashtagId);
     }
 
-    private List<String> convertJsonToList(String jsonImageUrls) {
+    // 게시글에서 한 개 이상의 이미지 URL을 제거하는 메서드
+    @Override
+    public void removeImageUrlFromBoard(Long boardId, String imageUrl) throws Exception {
+        Board board = getBoardById(boardId);
+        if (board != null) {
+            List<String> currentImageUrls = board.getImageUrls();
+            boolean isRemoved = currentImageUrls.removeIf(url -> url.equals(imageUrl));
+            if (isRemoved) {
+                // 이미지 URL 리스트를 JSON 문자열로 변환하여 데이터베이스를 업데이트합니다.
+                String updatedImageUrlsJson = convertListToJson(currentImageUrls);
+                updateBoardImageUrls(boardId, updatedImageUrlsJson); // JSON 문자열을 전달합니다.
+            } else {
+                throw new Exception("해당 이미지 URL을 찾을 수 없습니다.");
+            }
+        } else {
+            throw new Exception("게시글을 찾을 수 없습니다.");
+        }
+    }
+
+    // 이미지 URL 리스트를 JSON 문자열로 변환하는 메서드
+    private String convertListToJson(List<String> imageUrls) {
+        if (imageUrls == null || imageUrls.isEmpty()) {
+            return "[]"; // 빈 리스트는 빈 JSON 배열로 변환
+        }
+
         ObjectMapper mapper = new ObjectMapper();
         try {
-            return mapper.readValue(jsonImageUrls, new TypeReference<List<String>>(){});
+            return mapper.writeValueAsString(imageUrls);
         } catch (JsonProcessingException e) {
+            logger.error("JSON 변환 중 오류 발생", e);
             throw new RuntimeException("JSON 변환 중 오류 발생", e);
         }
     }
 
+    public void updateBoardImageUrls(Long boardId, String imageUrlsJson) {
+        String sql = "UPDATE boards SET image_urls = ? WHERE id = ?";
+        jdbcTemplate.update(sql, imageUrlsJson, boardId);
+    }
 
 }

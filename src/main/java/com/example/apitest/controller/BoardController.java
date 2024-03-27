@@ -177,6 +177,7 @@ public class BoardController {
         }
     }
 
+    //이미지만 삭제
     @DeleteMapping("/images")
     public ResponseEntity<?> deleteImage(@RequestParam String imageUrl, HttpServletRequest request) {
         try {
@@ -185,12 +186,37 @@ public class BoardController {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("인증되지 않은 사용자입니다.");
             }
 
+            awsS3Service.deleteFileFromS3(imageUrl); // AWS S3에서 이미지 삭제
+
+
             boardService.deleteImage(imageUrl);
             return ResponseEntity.ok().body("이미지가 성공적으로 삭제되었습니다.");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("이미지 삭제 중 오류가 발생했습니다.");
         }
     }
+
+    // 게시글에서 이미지를 삭제하는 엔드포인트
+    @DeleteMapping("/{boardId}/images")
+    public ResponseEntity<?> deleteImage(@PathVariable Long boardId, @RequestParam String imageUrl, HttpServletRequest request) {
+        try {
+            String token = jwtUtils.extractToken(request);
+            if (token == null || !jwtUtils.validateToken(token)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("인증되지 않은 사용자입니다.");
+            }
+
+            // AWS S3에서 이미지 삭제
+            awsS3Service.deleteFileFromS3(imageUrl);
+
+            // boards 테이블에서 이미지 URL 제거
+            boardService.removeImageUrlFromBoard(boardId, imageUrl);
+
+            return ResponseEntity.ok().body("이미지가 성공적으로 삭제되었습니다.");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("이미지 삭제 중 오류가 발생했습니다.");
+        }
+    }
+
 
     @GetMapping("/paged")
     public ResponseEntity<Page<Board>> getBoardsPaged(
