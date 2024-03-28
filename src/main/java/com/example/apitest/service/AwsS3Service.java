@@ -99,19 +99,30 @@ public class AwsS3Service {
 
     // S3 버킷에서 특정 파일을 삭제하는 메소드
     public void deleteFileFromS3(String fileUrl) throws AmazonServiceException {
-        // fileUrl에서 파일의 키를 추출합니다.
-        String fileKey = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
-
         try {
-            // S3 버킷에서 파일 삭제 요청
-            amazonS3Client.deleteObject(new DeleteObjectRequest(bucketName, fileKey));
-            logger.info("File deleted successfully from S3: {}", fileKey);
+            // URL에서 객체 키 추출
+            String key = fileUrl.replace("https://" + bucketName + ".s3.amazonaws.com/", "");
+            amazonS3Client.deleteObject(new DeleteObjectRequest(bucketName, key));
+            logger.info("파일이 S3에서 성공적으로 삭제되었습니다: {}", key);
         } catch (AmazonServiceException e) {
-            logger.error("Error deleting file from S3: {}", e.getMessage());
+            logger.error("S3에서 파일 삭제 중 오류가 발생했습니다: {}", e.getMessage());
             throw e;
         }
     }
 
+
+
+//    public void deleteFileFromS3(String fileKey) throws AmazonServiceException {
+//        try {
+//            // URL에서 버킷 이름과 도메인을 제거하고 객체 키만 사용
+//            String keyWithoutBucket = fileKey.replace("https://"+bucketName+".s3.amazonaws.com/", "");
+//            amazonS3Client.deleteObject(new DeleteObjectRequest(bucketName, keyWithoutBucket));
+//            logger.info("파일이 S3에서 성공적으로 삭제되었습니다: {}", keyWithoutBucket);
+//        } catch (AmazonServiceException e) {
+//            logger.error("S3에서 파일 삭제 중 오류가 발생했습니다: {}", e.getMessage());
+//            throw e;
+//        }
+//    }
 
 
 

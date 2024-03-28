@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -31,6 +32,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.util.Optional;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
 
 
 @Service
@@ -41,6 +43,9 @@ public class BoardServiceImpl implements BoardService {
     private final ImageRepository imageRepository;
 
     private static final Logger logger = LoggerFactory.getLogger(BoardServiceImpl.class);
+
+    @Value("${cloud.aws.s3.bucket}")
+    private String bucketName;
 
     @Autowired
     public BoardServiceImpl(BoardRepository boardRepository, JdbcTemplate jdbcTemplate, AwsS3Service awsS3Service, ImageRepository imageRepository) {
@@ -173,7 +178,7 @@ public class BoardServiceImpl implements BoardService {
     @Override
     public void deleteImage(String imageUrl) throws Exception {
         try {
-            // S3에서 이미지 파일 삭제
+
             awsS3Service.deleteFileFromS3(imageUrl);
 
             // DB에서 이미지 정보 삭제
@@ -183,7 +188,6 @@ public class BoardServiceImpl implements BoardService {
             throw new Exception("이미지 삭제 중 오류가 발생했습니다.");
         }
     }
-
 
     // 게시글 페이징 처리
     @Override
