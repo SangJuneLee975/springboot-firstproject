@@ -5,6 +5,7 @@ import com.amazonaws.regions.Regions;
 import com.example.apitest.DTO.*;
 import com.example.apitest.service.*;
 import com.example.apitest.config.JwtUtils;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.example.apitest.util.JsonUtil;
 import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -112,7 +114,8 @@ public class BoardController {
             @PathVariable Long id,
             @RequestPart("board") Board updatedBoard,
             @RequestParam(value = "file", required = false) MultipartFile[] files,
-            HttpServletRequest request) {
+            @RequestParam(value = "deletedImageUrls", required = false) List<String> deletedImageUrls,
+            HttpServletRequest request) throws JsonProcessingException {
 
         String token = jwtUtils.extractToken(request);
         if (token == null || !jwtUtils.validateToken(token)) {
@@ -128,6 +131,19 @@ public class BoardController {
             // 게시글 정보 업데이트
             existingBoard.setTitle(updatedBoard.getTitle());
             existingBoard.setContent(updatedBoard.getContent());
+            existingBoard.setCategoryId(updatedBoard.getCategoryId());
+
+            // 이미지 URL들을 데이터베이스에서 업데이트하기 전에 삭제 처리
+            if (deletedImageUrls != null) {
+                deletedImageUrls.forEach(url -> {
+                    try {
+                        boardService.deleteImage(url);
+                        existingBoard.getImageUrls().remove(url);
+                    } catch (Exception e) {
+                        logger.error("이미지 삭제 실패(boardcontroller): {}", url, e);
+                    }
+                });
+            }
 
             // 기존의 게시글과 관련된 해시태그들을 제거
             hashtagService.removeHashtagsFromBoard(id);
@@ -146,9 +162,13 @@ public class BoardController {
             }
 
             //파일 로직 추가 필요
+            // 이미지 URL 리스트를 JSON 문자열로 변환하여 데이터베이스 업데이트
+           // String imageUrlsJson = JsonUtil.listToJson(existingBoard.getImageUrls());
+
+            boardService.updateBoardImageUrls(id, existingBoard.getImageUrls());
 
             // 게시글 정보 저장
-            boardService.updateBoard(existingBoard);
+            boardService.updateBoard(existingBoard, deletedImageUrls);
 
             return ResponseEntity.ok().body("게시글이 성공적으로 수정되었습니다.");
         } else {
@@ -186,6 +206,8 @@ public class BoardController {
             logger.error("Token validation failed.");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("인증되지 않은 사용자입니다.");
         }
+
+
         String fileKey = params.get("key");
         logger.info("Attempting to delete file with key: {}", fileKey);
         try {
@@ -201,47 +223,48 @@ public class BoardController {
         }
     }
 
+
     // 이미지만 삭제하는 엔드포인트
-    @DeleteMapping("/images/{imageUrl}")
-    public ResponseEntity<?> deleteImage(
-            @PathVariable String imageUrl,
-            HttpServletRequest request) {
-
-
-        String token = jwtUtils.extractToken(request);
-        if (token == null || !jwtUtils.validateToken(token)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("인증되지 않은 사용자입니다.");
-        }
-
-        try {
-            boardService.deleteImage(imageUrl);
-            return ResponseEntity.ok().body("이미지가 성공적으로 삭제되었습니다.");
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("이미지 삭제 중 오류가 발생했습니다.");
-        }
-    }
-
-
-    // 게시글에서 이미지를 삭제하는 엔드포인트
-    @DeleteMapping("/{boardId}/images")
-    public ResponseEntity<?> deleteImage(@PathVariable Long boardId, @RequestParam String imageUrl, HttpServletRequest request) {
-        try {
-            String token = jwtUtils.extractToken(request);
-            if (token == null || !jwtUtils.validateToken(token)) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("인증되지 않은 사용자입니다.");
-            }
-
-            // AWS S3에서 이미지 삭제
-            awsS3Service.deleteFileFromS3(imageUrl);
-
-            // boards 테이블에서 이미지 URL 제거
-            boardService.removeImageUrlFromBoard(boardId, imageUrl);
-
-            return ResponseEntity.ok().body("이미지가 성공적으로 삭제되었습니다.");
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("이미지 삭제 중 오류가 발생했습니다.");
-        }
-    }
+//    @DeleteMapping("/images/{imageUrl}")
+//    public ResponseEntity<?> deleteImage(
+//            @PathVariable String imageUrl,
+//            HttpServletRequest request) {
+//
+//
+//        String token = jwtUtils.extractToken(request);
+//        if (token == null || !jwtUtils.validateToken(token)) {
+//            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("인증되지 않은 사용자입니다.");
+//        }
+//
+//        try {
+//            boardService.deleteImage(imageUrl);
+//            return ResponseEntity.ok().body("이미지가 성공적으로 삭제되었습니다.");
+//        } catch (Exception e) {
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("이미지 삭제 중 오류가 발생했습니다.");
+//        }
+//    }
+//
+//
+//    // 게시글에서 이미지를 삭제하는 엔드포인트
+//    @DeleteMapping("/{boardId}/images")
+//    public ResponseEntity<?> deleteImage(@PathVariable Long boardId, @RequestParam String imageUrl, HttpServletRequest request) {
+//        try {
+//            String token = jwtUtils.extractToken(request);
+//            if (token == null || !jwtUtils.validateToken(token)) {
+//                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("인증되지 않은 사용자입니다.");
+//            }
+//
+//            // AWS S3에서 이미지 삭제
+//            awsS3Service.deleteFileFromS3(imageUrl);
+//
+//            // boards 테이블에서 이미지 URL 제거
+//            boardService.removeImageUrlFromBoard(boardId, imageUrl);
+//
+//            return ResponseEntity.ok().body("이미지가 성공적으로 삭제되었습니다.");
+//        } catch (Exception e) {
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("이미지 삭제 중 오류가 발생했습니다.");
+//        }
+//    }
 
 
     @GetMapping("/paged")
