@@ -23,4 +23,6 @@ public interface BoardRepository {
     public void addHashtagToBoard(Long boardId, Long hashtagId);
 
     public void saveImageUrls(List<String> imageUrls, Long boardId); //이미지를 업로드하고 반환받은 URL을 DB에 저장하는 로직
+
+    public Long save(Board board); // 게시글 저장 후 생성된 ID 반환
 }

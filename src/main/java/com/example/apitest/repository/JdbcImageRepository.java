@@ -5,16 +5,14 @@ import com.example.apitest.service.BoardServiceImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.List;
 
 @Repository
@@ -41,27 +39,24 @@ public class JdbcImageRepository implements ImageRepository {
 
     @Override
     public void save(Image image) {
+        String sql = "INSERT INTO images (image_url, board_id) VALUES (?, ?)";
         KeyHolder keyHolder = new GeneratedKeyHolder();
+
         jdbcTemplate.update(connection -> {
-            PreparedStatement ps = connection.prepareStatement(
-                    "INSERT INTO images (image_url, board_id) VALUES (?, ?)",
-                    Statement.RETURN_GENERATED_KEYS
-            );
+            PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
             ps.setString(1, image.getImageUrl());
-            ps.setLong(2, image.getBoardId());
+            ps.setObject(2, image.getBoardId(), Types.BIGINT); // boardId가 null인 경우를 처리
             return ps;
         }, keyHolder);
 
-
-        Number key = keyHolder.getKey();
-        if (key != null) {
-            image.setId(key.longValue());
-            System.out.println("DB에 이미지 ID와 함께 저장됨: " + image.getId());
+        if (keyHolder.getKey() != null) {
+            image.setId(keyHolder.getKey().longValue());
+            logger.info("이미지가 저장되었습니다. Image ID: {}", image.getId());
         } else {
-            System.out.println("저장된 이미지의 ID를 가져오기 실패함.");
+            logger.error("이미지 저장에 실패했습니다. Image URL: {}", image.getImageUrl());
+            // 적절한 예외 처리
         }
     }
-
 
     @Override
     public void update(Image image) {
@@ -77,12 +72,7 @@ public class JdbcImageRepository implements ImageRepository {
     public void saveImageUrls(List<String> imageUrls, Long boardId) {
         String sql = "INSERT INTO images (image_url, board_id) VALUES (?, ?)";
         for (String imageUrl : imageUrls) {
-            int update = jdbcTemplate.update(sql, imageUrl, boardId);
-            if (update > 0) {
-                logger.info("Image URL saved successfully: {}", imageUrl);
-            } else {
-                logger.error("Failed to save image URL: {}", imageUrl);
-            }
+            jdbcTemplate.update(sql, imageUrl, boardId);
         }
     }
 

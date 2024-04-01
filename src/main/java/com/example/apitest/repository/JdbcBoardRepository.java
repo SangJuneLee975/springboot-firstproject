@@ -1,6 +1,7 @@
 package com.example.apitest.repository;
 
 import com.example.apitest.DTO.Board;
+import com.example.apitest.DTO.Image;
 import com.example.apitest.util.JsonUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,6 +17,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 
 import com.example.apitest.util.JsonUtil;
 import java.sql.*;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 
@@ -28,14 +30,15 @@ import java.util.Arrays;
 @Repository
 public class JdbcBoardRepository implements BoardRepository {
     private final JdbcTemplate jdbcTemplate;
+    private final ImageRepository imageRepository;
 
     private static final Logger logger = LoggerFactory.getLogger(JdbcBoardRepository.class);
 
     @Autowired
-    public JdbcBoardRepository(JdbcTemplate jdbcTemplate) {
+    public JdbcBoardRepository(JdbcTemplate jdbcTemplate, ImageRepository imageRepository) {
         this.jdbcTemplate = jdbcTemplate;
+        this.imageRepository = imageRepository; // 생성자를 통한 ImageRepository 주입
     }
-
 
     @Override
     public List<Board> findAll() {
@@ -91,5 +94,31 @@ public class JdbcBoardRepository implements BoardRepository {
                 throw new RuntimeException("이미지 URL 저장 중 문제가 발생했습니다.", e);
             }
         }
+    }
+
+    @Override
+    public Long save(Board board) {
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement("INSERT INTO boards (title, content, writer, date, category_id) VALUES (?, ?, ?, ?, ?)", Statement.RETURN_GENERATED_KEYS);
+            ps.setString(1, board.getTitle());
+            ps.setString(2, board.getContent());
+            ps.setString(3, board.getWriter());
+            ps.setTimestamp(4, Timestamp.valueOf(LocalDateTime.now()));
+            ps.setLong(5, board.getCategoryId());
+            return ps;
+        }, keyHolder);
+
+        Long boardId = keyHolder.getKey().longValue();
+
+        // 이미지 URL들을 images 테이블에 저장
+        if (board.getImageUrls() != null) {
+            for (String imageUrl : board.getImageUrls()) {
+                Image image = new Image(null, imageUrl, boardId);
+                imageRepository.save(image);
+            }
+        }
+
+        return boardId;
     }
 }

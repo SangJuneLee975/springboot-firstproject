@@ -3,9 +3,11 @@ package com.example.apitest.controller;
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.regions.Regions;
 import com.example.apitest.DTO.*;
+import com.example.apitest.repository.ImageRepository;
 import com.example.apitest.service.*;
 import com.example.apitest.config.JwtUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,6 +34,8 @@ public class BoardController {
     private final HashtagService hashtagService;
     private final JwtUtils jwtUtils; // JwtUtils 필드 추가
     private final AwsS3Service awsS3Service;
+    private final ImageRepository imageRepository;
+
 
     @Value("${cloud.aws.s3.bucket}")
     private String bucketName;
@@ -40,13 +44,14 @@ public class BoardController {
 
     @Autowired
     public BoardController(UserService userService, BoardService boardService, JwtUtils jwtUtils, HashtagService hashtagService,
-                           AwsS3Service awsS3Service) {
+                           AwsS3Service awsS3Service, ImageRepository imageRepository) {
 
         this.userService = userService;
         this.boardService = boardService;
         this.hashtagService = hashtagService;
         this.jwtUtils = jwtUtils;
         this.awsS3Service = awsS3Service;
+        this.imageRepository = imageRepository;
     }
 
     // 게시판 목록 조회
@@ -64,12 +69,11 @@ public class BoardController {
 
     @PostMapping("/new")
     public ResponseEntity<?> createBoard(
-            @RequestPart("board") Board board,
+            @RequestPart("board") String boardString,
             @RequestParam(value = "file", required = false) MultipartFile[] files,
             HttpServletRequest request) throws IOException {
 
         String token = jwtUtils.extractToken(request);
-
         if (token == null || !jwtUtils.validateToken(token)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("인증되지 않은 사용자입니다.");
         }
@@ -80,33 +84,31 @@ public class BoardController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("사용자를 찾을 수 없습니다.");
         }
 
-        board.setWriter(user.getNickname()); // 게시글 작성자 설정
-
-        // 파일 리스트를 MultipartFile 리스트로 변환
-        List<MultipartFile> multipartFiles = files != null ? Arrays.asList(files) : new ArrayList<>();
-
+        // Board 객체 생성
+        Board board = new ObjectMapper().readValue(boardString, Board.class);
+        board.setWriter(user.getNickname());
 
 
-        // 게시글 정보와 파일 리스트를 함께 저장
-        Board createdBoard = boardService.createBoard(board, multipartFiles);
-
-
-        // 해시태그 처리
+        // 해시태그 처리 로직을 여기에 유지합니다.
         if (board.getHashtags() != null && !board.getHashtags().isEmpty()) {
-            for (Hashtag submittedHashtag : board.getHashtags()) {
-                Hashtag existingHashtag = hashtagService.findHashtagByName(submittedHashtag.getName());
+            for (Hashtag hashtag : board.getHashtags()) {
+                Hashtag existingHashtag = hashtagService.findHashtagByName(hashtag.getName());
                 if (existingHashtag == null) {
                     existingHashtag = new Hashtag();
-                    existingHashtag.setName(submittedHashtag.getName());
+                    existingHashtag.setName(hashtag.getName());
                     hashtagService.createHashtag(existingHashtag);
                 }
-                boardService.addHashtagToBoard(createdBoard.getId(), existingHashtag.getId());
+                boardService.addHashtagToBoard(board.getId(), existingHashtag.getId());
             }
         }
 
+        // 파일이 null이거나 비어있지 않은지 확인
+        List<MultipartFile> fileList = (files != null) ? Arrays.asList(files) : Collections.emptyList();
+        // 게시글 및 이미지 정보 저장
+        Board createdBoard = boardService.createBoard(board, fileList);
+
         return ResponseEntity.status(HttpStatus.CREATED).body(createdBoard);
     }
-
 
     // 게시글 수정
     @PutMapping("/{id}")
@@ -138,7 +140,7 @@ public class BoardController {
                 deletedImageUrls.forEach(url -> {
                     try {
                         boardService.deleteImage(url);
-                        existingBoard.getImageUrls().remove(url);
+                  //      existingBoard.getImageUrls().remove(url);
                     } catch (Exception e) {
                         logger.error("이미지 삭제 실패(boardcontroller): {}", url, e);
                     }
@@ -165,7 +167,7 @@ public class BoardController {
             // 이미지 URL 리스트를 JSON 문자열로 변환하여 데이터베이스 업데이트
            // String imageUrlsJson = JsonUtil.listToJson(existingBoard.getImageUrls());
 
-            boardService.updateBoardImageUrls(id, existingBoard.getImageUrls());
+      //      boardService.updateBoardImageUrls(id, existingBoard.getImageUrls());
 
             // 게시글 정보 저장
             boardService.updateBoard(existingBoard, deletedImageUrls);
@@ -211,7 +213,8 @@ public class BoardController {
         String fileKey = params.get("key");
         logger.info("Attempting to delete file with key: {}", fileKey);
         try {
-            awsS3Service.deleteFileFromS3(fileKey); // 파일 키를 전달하여 삭제
+            awsS3Service.deleteFileFromS3(params.get("key"));
+
             logger.info("File deleted successfully with key: {}", fileKey);
             return ResponseEntity.ok().body("이미지가 성공적으로 삭제되었습니다.");
         } catch (AmazonServiceException e) {

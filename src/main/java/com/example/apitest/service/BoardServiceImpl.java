@@ -3,6 +3,7 @@ package com.example.apitest.service;
 import com.amazonaws.AmazonServiceException;
 import com.example.apitest.DTO.Board;
 import com.example.apitest.DTO.Hashtag;
+import com.example.apitest.DTO.Image;
 import com.example.apitest.repository.BoardRepository;
 import com.example.apitest.repository.ImageRepository;
 import com.example.apitest.util.JsonUtil;
@@ -25,13 +26,11 @@ import org.springframework.jdbc.support.KeyHolder;
 import java.io.IOException;
 import java.sql.*;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import org.springframework.web.multipart.MultipartFile;
 import com.fasterxml.jackson.core.type.TypeReference;
-import java.util.Optional;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 
@@ -86,68 +85,27 @@ public class BoardServiceImpl implements BoardService {
     // 게시판 생성
     @Override
     public Board createBoard(Board board, List<MultipartFile> multipartFiles) throws IOException {
-        KeyHolder keyHolder = new GeneratedKeyHolder();
-        String sql = "INSERT INTO boards (title, content, writer, date, category_id, image_urls) VALUES (?, ?, ?, ?, ?, ?)";
 
-        try {
-            List<String> imageUrls = new ArrayList<>();
-            if (multipartFiles != null && !multipartFiles.isEmpty()) {
-                // 이미지 파일들을 S3에 업로드하고, URL을 리스트로 수집
-                for (MultipartFile file : multipartFiles) {
-                    if (!file.isEmpty()) {
-                        String imageUrl = awsS3Service.uploadFileToS3(file);
-                        if (imageUrl != null && !imageUrl.isEmpty()) {
-                            imageUrls.add(imageUrl);
-                            logger.info("Image uploaded to S3 and URL added to list: {}", imageUrl);
-                        } else {
-                            // 파일 업로드 실패 처리
-                            logger.error("Failed to upload file to S3: {}", file.getOriginalFilename());
+        Long boardId = boardRepository.save(board);
+        board.setId(boardId);
 
-                        }
-                    }
+        List<String> imageUrls = new ArrayList<>();
+        if (multipartFiles != null && !multipartFiles.isEmpty()) {
+            for (MultipartFile file : multipartFiles) {
+                if (!file.isEmpty()) {
+                    // 각 파일(이미지)을 AWS S3에 업로드하고, 업로드된 이미지의 URL을 받습니다.
+                    String imageUrl = awsS3Service.uploadFileToS3(file);
+                    imageUrls.add(imageUrl);
+
+                    // 업로드된 이미지 정보를 데이터베이스에 저장합니다. 이미지 객체에는 이미지 URL과 게시글 ID가 포함됩니다.
+                    Image image = new Image(null, imageUrl, board.getId());
+                    imageRepository.save(image);
                 }
             }
-
-
-            //String imageUrlsJson = JsonUtil.listToJson(board.getImageUrls()); // imageUrls를 JSON으로 변환
-
-            // imageUrls 리스트를 JSON 문자열로 변환하여 저장
-         //   String imageUrlsJson = JsonUtil.convertListToJson(imageUrls); // 수정된 부분
-
-            String imageUrlsJson = JsonUtil.convertListToJson(board.getImageUrls()); // 수정된 부분
-
-
-
-            jdbcTemplate.update(connection -> {
-                PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
-                ps.setString(1, board.getTitle());
-                ps.setString(2, board.getContent());
-                ps.setString(3, board.getWriter());
-                ps.setTimestamp(4, Timestamp.valueOf(LocalDateTime.now()));
-                ps.setLong(5, board.getCategoryId());
-                ps.setString(6, imageUrlsJson); // JSON 문자열 저장
-                return ps;
-            }, keyHolder);
-
-            // 새로 생성된 게시글 ID를 Board 객체에 설정
-            Long boardId = keyHolder.getKey().longValue();
-            board.setId(boardId);
-            board.setImageUrls(imageUrls); // 이미지 URL 리스트 설정
-
-            // images 테이블에 이미지 URL들 저장
-            if (!imageUrls.isEmpty()) {
-                logger.info("Saving image URLs to the images table for boardId: {}", boardId);
-                imageRepository.saveImageUrls(imageUrls, boardId);
-            }
-
-
-            return board;
-
-        } catch (DataAccessException | IOException e) {
-
-            logger.error("Error creating board: {}", e.getMessage(), e);
-            throw new RuntimeException("게시글 생성 중 문제가 발생했습니다.", e);
         }
+
+        board.setImageUrls(imageUrls);
+        return board;
     }
 
 
@@ -166,6 +124,12 @@ public class BoardServiceImpl implements BoardService {
                     logger.error("Error deleting image: {}", e.getMessage(), e);
                 }
             });
+        }
+
+        if (deletedImageUrls != null && !deletedImageUrls.isEmpty()) {
+            List<String> currentImageUrls = new ArrayList<>(board.getImageUrls());
+            currentImageUrls.removeAll(deletedImageUrls);
+            board.setImageUrls(currentImageUrls);
         }
 
         // 변경된 이미지 URL 리스트를 데이터베이스에 업데이트합니다.
@@ -189,6 +153,7 @@ public class BoardServiceImpl implements BoardService {
             imageUrls.forEach(imageUrl -> {
                 try {
                     awsS3Service.deleteFileFromS3(imageUrl);
+                    imageRepository.deleteByImageUrl(imageUrl); // 이미지 URL을 images 테이블에서 삭제합니다.
                 } catch (AmazonServiceException e) {
                     logger.error("Error deleting image from S3: {}", e.getMessage(), e);
                 }
