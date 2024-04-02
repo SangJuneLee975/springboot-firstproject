@@ -81,18 +81,18 @@ public class AwsS3Service {
         ObjectMetadata metadata = new ObjectMetadata();
         metadata.setContentType(multipartFile.getContentType());
         metadata.setContentLength(multipartFile.getSize());
-        logger.info("Uploading file to S3: {}", fileName);
+        logger.info("S3에 파일 업로드 중: {}", fileName);
 
         try (InputStream inputStream = multipartFile.getInputStream()) {
             amazonS3Client.putObject(bucketName, fileName, inputStream, metadata);
             String fileUrl = amazonS3Client.getUrl(bucketName, fileName).toString();
-            logger.info("File uploaded successfully to S3. URL: {}", fileUrl);
+            logger.info("S3에 파일이 성공적으로 업로드됨. URL: {}", fileUrl);
             return fileUrl;
         } catch (AmazonServiceException e) {
-            logger.error("AWS service error: {}", e.getMessage());
+            logger.error("AWS 서비스 오류: {}", e.getMessage());
             throw e;
         } catch (IOException e) {
-            logger.error("File IO error: {}", e.getMessage());
+            logger.error("파일 IO 오류: {}", e.getMessage());
             throw e;
         }
     }
@@ -102,9 +102,9 @@ public class AwsS3Service {
         try {
             String fileKey = extractFileKeyFromUrl(fileUrl); // 파일 URL에서 객체 키 추출
             amazonS3Client.deleteObject(new DeleteObjectRequest(bucketName, fileKey));
-            logger.info("File deleted successfully from S3: {}", fileKey);
+            logger.info("S3에서 파일이 성공적으로 삭제됨: {}", fileKey);
         } catch (AmazonServiceException e) {
-            logger.error("Error deleting file from S3: {}", e.getMessage());
+            logger.error("S3에서 파일 삭제 중 오류 발생: {}", e.getMessage());
             throw e;
         }
     }

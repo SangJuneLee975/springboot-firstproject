@@ -1,7 +1,9 @@
 package com.example.apitest.service;
 
+import com.amazonaws.AmazonServiceException;
 import com.example.apitest.DTO.Board;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -19,10 +21,6 @@ public interface BoardService {
 
  public Page<Board> getBoardsPaged(int page, int size);
 
- public void deleteImage(String imageUrl);
-
  public void addHashtagToBoard(Long boardId, Long hashtagId); // 게시글과 해시태그 관계
-
- public void updateBoardImageUrls(Long boardId, List<String> imageUrls) throws JsonProcessingException; // 이미지 URL 리스트를 데이터베이스에 업데이트하는 메서드
 
 }

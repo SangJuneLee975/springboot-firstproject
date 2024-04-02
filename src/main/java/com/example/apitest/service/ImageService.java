@@ -9,4 +9,5 @@ public interface ImageService {
     public void saveImage(Image image);
     public void updateImage(Image image);
     public void deleteImage(Long id);
+
 }

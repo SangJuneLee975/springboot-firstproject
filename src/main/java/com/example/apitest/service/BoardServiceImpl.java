@@ -67,8 +67,8 @@ public class BoardServiceImpl implements BoardService {
                 board.setWriter(rs.getString("writer"));
                 board.setDate(rs.getTimestamp("date").toLocalDateTime());
                 board.setCategoryId(rs.getLong("category_id"));
-                // 여기서 추가 데이터 조회가 필요한 경우 해당 로직을 구현
-                // 예: 이미지 URL 목록 조회
+
+                //  이미지 URL 목록 조회
                 List<String> imageUrls = imageRepository.findImageUrlsByBoardId(board.getId());
                 board.setImageUrls(imageUrls);
                 return board;
@@ -76,9 +76,40 @@ public class BoardServiceImpl implements BoardService {
         });
     }
 
+
+    // 게시판 상세 조회
     @Override
     public Board getBoardById(Long id) {
-        return boardRepository.findById(id);
+        String sql = "SELECT b.*, i.image_url " +
+                "FROM boards b " +
+                "LEFT JOIN images i ON b.id = i.board_id " +
+                "WHERE b.id = ?";
+
+        Map<Long, Board> boards = new HashMap<>();
+        jdbcTemplate.query(sql, new Object[]{id}, rs -> {
+            Long boardId = rs.getLong("id");
+            Board board = boards.get(boardId);
+            if (board == null) {
+                // Board 객체를 새로 생성하고 기본 정보를 설정
+                board = new Board();
+                board.setId(boardId);
+                board.setTitle(rs.getString("title"));
+                board.setContent(rs.getString("content"));
+                board.setWriter(rs.getString("writer"));
+                board.setDate(rs.getTimestamp("date").toLocalDateTime());
+                board.setCategoryId(rs.getLong("category_id"));
+                board.setImageUrls(new ArrayList<>()); // 이미지 URL을 담을 리스트를 초기화
+                boards.put(boardId, board);
+            }
+            // 이미지 URL이 있으면 리스트에 추가
+            String imageUrl = rs.getString("image_url");
+            if (imageUrl != null) {
+                board.getImageUrls().add(imageUrl);
+            }
+        });
+
+        // 조회된 게시글이 없으면 null을 반환
+        return boards.isEmpty() ? null : boards.values().iterator().next();
     }
 
 
@@ -93,20 +124,20 @@ public class BoardServiceImpl implements BoardService {
         if (multipartFiles != null && !multipartFiles.isEmpty()) {
             for (MultipartFile file : multipartFiles) {
                 if (!file.isEmpty()) {
-                    // 각 파일(이미지)을 AWS S3에 업로드하고, 업로드된 이미지의 URL을 받습니다.
+                    // 각 파일(이미지)을 AWS S3에 업로드하고, 업로드된 이미지의 URL을 받음
                     String imageUrl = awsS3Service.uploadFileToS3(file);
                     imageUrls.add(imageUrl);
 
-                    // 업로드된 이미지 정보를 데이터베이스에 저장합니다. 이미지 객체에는 이미지 URL과 게시글 ID가 포함됩니다.
+                    // 업로드된 이미지 정보를 데이터베이스에 저장
                     Image image = new Image(null, imageUrl, board.getId());
                     imageRepository.save(image);
                 }
             }
         }
-
         board.setImageUrls(imageUrls);
         return board;
     }
+
 
 
 
@@ -116,32 +147,8 @@ public class BoardServiceImpl implements BoardService {
         String sqlUpdateBoard = "UPDATE boards SET title = ?, content = ?, category_id = ? WHERE id = ?";
         jdbcTemplate.update(sqlUpdateBoard, board.getTitle(), board.getContent(), board.getCategoryId(), board.getId());
 
-        if (deletedImageUrls != null && !deletedImageUrls.isEmpty()) {
-            deletedImageUrls.forEach(url -> {
-                try {
-                    deleteImage(url);
-                } catch (RuntimeException e) { // deleteImage에서 RuntimeException을 던짐
-                    logger.error("Error deleting image: {}", e.getMessage(), e);
-                }
-            });
-        }
-
-        if (deletedImageUrls != null && !deletedImageUrls.isEmpty()) {
-            List<String> currentImageUrls = new ArrayList<>(board.getImageUrls());
-            currentImageUrls.removeAll(deletedImageUrls);
-            board.setImageUrls(currentImageUrls);
-        }
-
-        // 변경된 이미지 URL 리스트를 데이터베이스에 업데이트합니다.
-        updateBoardImageUrls(board.getId(), board.getImageUrls());
     }
 
-    @Override
-    public void updateBoardImageUrls(Long boardId, List<String> imageUrls) throws JsonProcessingException {
-        String imageUrlsJson = JsonUtil.convertListToJson(imageUrls); // 이미 JSON 변환 메서드를 호출
-        String sqlUpdateImageUrls = "UPDATE boards SET image_urls = ? WHERE id = ?";
-        jdbcTemplate.update(sqlUpdateImageUrls, imageUrlsJson, boardId);
-    }
 
 
     // 게시판 글 삭제
@@ -149,11 +156,11 @@ public class BoardServiceImpl implements BoardService {
     public void deleteBoard(Long id) {
         Board board = getBoardById(id);
         if (board != null) {
-            List<String> imageUrls = board.getImageUrls(); // 이미 리스트이기 때문에 변환 과정 생략
+            List<String> imageUrls = board.getImageUrls();
             imageUrls.forEach(imageUrl -> {
                 try {
                     awsS3Service.deleteFileFromS3(imageUrl);
-                    imageRepository.deleteByImageUrl(imageUrl); // 이미지 URL을 images 테이블에서 삭제합니다.
+                    imageRepository.deleteByImageUrl(imageUrl); // 이미지 URL을 images 테이블에서 삭제
                 } catch (AmazonServiceException e) {
                     logger.error("Error deleting image from S3: {}", e.getMessage(), e);
                 }
@@ -161,37 +168,6 @@ public class BoardServiceImpl implements BoardService {
             // DB에서 게시글 삭제
             String sql = "DELETE FROM boards WHERE id = ?";
             jdbcTemplate.update(sql, id);
-        }
-    }
-
-
-//    @Override
-//    public void deleteBoard(Long id) {
-//        // 게시글에 연결된 이미지 URL들을 조회
-//        Board board = getBoardById(id);
-//        if (board != null) {
-//            List<String> imageUrls = board.getImageUrls();
-//            if (imageUrls != null) {
-//                for (String imageUrl : imageUrls) {
-//                    // S3 버킷에서 이미지 삭제
-//                    awsS3Service.deleteFileFromS3(imageUrl);
-//                }
-//            }
-//            // DB에서 게시글 삭제
-//            String sql = "DELETE FROM boards WHERE id = ?";
-//            jdbcTemplate.update(sql, id);
-//        }
-//    }
-
-
-    @Override
-    public void deleteImage(String imageUrl) {
-        try {
-            awsS3Service.deleteFileFromS3(imageUrl);
-            imageRepository.deleteByImageUrl(imageUrl);
-        } catch (AmazonServiceException e) {
-            logger.error("Error deleting image from S3: {}", e.getMessage(), e);
-            throw new RuntimeException("Error deleting image from S3", e);
         }
     }
 
@@ -223,23 +199,6 @@ public class BoardServiceImpl implements BoardService {
     public void addHashtagToBoard(Long boardId, Long hashtagId) {
         // 게시글과 해시태그 연결 로직 구현
         boardRepository.addHashtagToBoard(boardId, hashtagId);
-    }
-
-
-
-    // 이미지 URL 리스트를 JSON 문자열로 변환하는 메서드
-    private String convertListToJson(List<String> imageUrls) {
-        if (imageUrls == null || imageUrls.isEmpty()) {
-            return "[]"; // 빈 리스트는 빈 JSON 배열로 변환
-        }
-
-        ObjectMapper mapper = new ObjectMapper();
-        try {
-            return mapper.writeValueAsString(imageUrls);
-        } catch (JsonProcessingException e) {
-            logger.error("JSON 변환 중 오류 발생", e);
-            throw new RuntimeException("JSON 변환 중 오류 발생", e);
-        }
     }
 
 

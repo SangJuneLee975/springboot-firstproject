@@ -114,10 +114,10 @@ public class BoardController {
     @PutMapping("/{id}")
     public ResponseEntity<?> updateBoard(
             @PathVariable Long id,
-            @RequestPart("board") Board updatedBoard,
+            @RequestPart("board") String boardString,
             @RequestParam(value = "file", required = false) MultipartFile[] files,
             @RequestParam(value = "deletedImageUrls", required = false) List<String> deletedImageUrls,
-            HttpServletRequest request) throws JsonProcessingException {
+            HttpServletRequest request) throws IOException {
 
         String token = jwtUtils.extractToken(request);
         if (token == null || !jwtUtils.validateToken(token)) {
@@ -130,21 +130,27 @@ public class BoardController {
 
         // 요청한 사용자가 게시글 작성자와 동일한지 확인
         if (existingBoard != null && userService.findByUserId(userId).getNickname().equals(existingBoard.getWriter())) {
+            Board updatedBoard = new ObjectMapper().readValue(boardString, Board.class);
+
             // 게시글 정보 업데이트
             existingBoard.setTitle(updatedBoard.getTitle());
             existingBoard.setContent(updatedBoard.getContent());
             existingBoard.setCategoryId(updatedBoard.getCategoryId());
 
-            // 이미지 URL들을 데이터베이스에서 업데이트하기 전에 삭제 처리
-            if (deletedImageUrls != null) {
-                deletedImageUrls.forEach(url -> {
+            // 이미지 삭제 로직
+            if (deletedImageUrls != null && !deletedImageUrls.isEmpty()) {
+                for (String imageUrl : deletedImageUrls) {
                     try {
-                        boardService.deleteImage(url);
-                  //      existingBoard.getImageUrls().remove(url);
+
+                        imageRepository.deleteByImageUrl(imageUrl); // 데이터베이스에서 이미지 URL 삭제
+                    } catch (AmazonServiceException e) {
+                        logger.error("AWS S3 deletion error: {}", e.getMessage());
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("S3에서 파일 삭제 중 오류가 발생했습니다.");
                     } catch (Exception e) {
-                        logger.error("이미지 삭제 실패(boardcontroller): {}", url, e);
+                        logger.error("Database deletion error: {}", e.getMessage());
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("데이터베이스에서 이미지 URL 삭제 중 오류가 발생했습니다.");
                     }
-                });
+                }
             }
 
             // 기존의 게시글과 관련된 해시태그들을 제거
@@ -163,11 +169,9 @@ public class BoardController {
                 }
             }
 
-            //파일 로직 추가 필요
-            // 이미지 URL 리스트를 JSON 문자열로 변환하여 데이터베이스 업데이트
-           // String imageUrlsJson = JsonUtil.listToJson(existingBoard.getImageUrls());
-
-      //      boardService.updateBoardImageUrls(id, existingBoard.getImageUrls());
+            // 게시글에 포함될 새 이미지 파일을 S3에 업로드하고 DB에 저장
+            List<MultipartFile> fileList = (files != null) ? Arrays.asList(files) : Collections.emptyList();
+            boardService.createBoard(existingBoard, fileList);
 
             // 게시글 정보 저장
             boardService.updateBoard(existingBoard, deletedImageUrls);
@@ -205,70 +209,27 @@ public class BoardController {
     public ResponseEntity<?> deleteImage(@RequestBody Map<String, String> params, HttpServletRequest request) {
         String token = jwtUtils.extractToken(request);
         if (token == null || !jwtUtils.validateToken(token)) {
-            logger.error("Token validation failed.");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("인증되지 않은 사용자입니다.");
         }
 
 
-        String fileKey = params.get("key");
-        logger.info("Attempting to delete file with key: {}", fileKey);
-        try {
-            awsS3Service.deleteFileFromS3(params.get("key"));
+        String dbImageUrl = params.get("dbImageUrl"); // DB에 저장된 전체 이미지 URL
+        String s3ImageKey = params.get("s3ImageKey"); // S3 버킷에 저장된 이미지 파일 경로
 
-            logger.info("File deleted successfully with key: {}", fileKey);
+        try {
+            // AWS S3에서 이미지 삭제
+            awsS3Service.deleteFileFromS3(s3ImageKey);
+
+            // DB에서 이미지 레코드 삭제
+            imageRepository.deleteByImageUrl(dbImageUrl);
+
             return ResponseEntity.ok().body("이미지가 성공적으로 삭제되었습니다.");
         } catch (AmazonServiceException e) {
-            logger.error("AWS S3 deletion error: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("S3에서 파일 삭제 중 오류가 발생했습니다.");
         } catch (Exception e) {
-            logger.error("Other deletion error: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("이미지 삭제 중 오류가 발생했습니다.");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("DB에서 이미지 삭제 중 오류가 발생했습니다.");
         }
     }
-
-
-    // 이미지만 삭제하는 엔드포인트
-//    @DeleteMapping("/images/{imageUrl}")
-//    public ResponseEntity<?> deleteImage(
-//            @PathVariable String imageUrl,
-//            HttpServletRequest request) {
-//
-//
-//        String token = jwtUtils.extractToken(request);
-//        if (token == null || !jwtUtils.validateToken(token)) {
-//            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("인증되지 않은 사용자입니다.");
-//        }
-//
-//        try {
-//            boardService.deleteImage(imageUrl);
-//            return ResponseEntity.ok().body("이미지가 성공적으로 삭제되었습니다.");
-//        } catch (Exception e) {
-//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("이미지 삭제 중 오류가 발생했습니다.");
-//        }
-//    }
-//
-//
-//    // 게시글에서 이미지를 삭제하는 엔드포인트
-//    @DeleteMapping("/{boardId}/images")
-//    public ResponseEntity<?> deleteImage(@PathVariable Long boardId, @RequestParam String imageUrl, HttpServletRequest request) {
-//        try {
-//            String token = jwtUtils.extractToken(request);
-//            if (token == null || !jwtUtils.validateToken(token)) {
-//                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("인증되지 않은 사용자입니다.");
-//            }
-//
-//            // AWS S3에서 이미지 삭제
-//            awsS3Service.deleteFileFromS3(imageUrl);
-//
-//            // boards 테이블에서 이미지 URL 제거
-//            boardService.removeImageUrlFromBoard(boardId, imageUrl);
-//
-//            return ResponseEntity.ok().body("이미지가 성공적으로 삭제되었습니다.");
-//        } catch (Exception e) {
-//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("이미지 삭제 중 오류가 발생했습니다.");
-//        }
-//    }
-
 
     @GetMapping("/paged")
     public ResponseEntity<Page<Board>> getBoardsPaged(

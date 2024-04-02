@@ -54,7 +54,6 @@ public class JdbcImageRepository implements ImageRepository {
             logger.info("이미지가 저장되었습니다. Image ID: {}", image.getId());
         } else {
             logger.error("이미지 저장에 실패했습니다. Image URL: {}", image.getImageUrl());
-            // 적절한 예외 처리
         }
     }
 
@@ -78,7 +77,13 @@ public class JdbcImageRepository implements ImageRepository {
 
     @Override
     public void deleteByImageUrl(String imageUrl) {
-        jdbcTemplate.update("DELETE FROM images WHERE image_url = ?", imageUrl);
+        String sql = "DELETE FROM images WHERE image_url = ?";
+        int affectedRows = jdbcTemplate.update(sql, imageUrl);
+        if(affectedRows > 0){
+            logger.info("이미지가 데이터베이스에서 삭제되었습니다: {}", imageUrl);
+        } else {
+            logger.warn("삭제할 이미지를 찾지 못했습니다: {}", imageUrl);
+        }
     }
 
     @Override

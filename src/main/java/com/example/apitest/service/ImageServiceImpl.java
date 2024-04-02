@@ -40,4 +40,5 @@ public class ImageServiceImpl implements ImageService {
     public void deleteImage(Long id) {
         imageRepository.delete(id);
     }
+
 }
