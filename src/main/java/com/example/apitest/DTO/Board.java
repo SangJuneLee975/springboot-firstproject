@@ -31,6 +31,6 @@ public class Board {
 
     private List<String> imageUrls; // 이미지 URL 목록 추가
 
-
+    private Boolean hasImage; // 이미지 존재 여부
 
 }

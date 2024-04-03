@@ -171,10 +171,11 @@ public class BoardController {
 
             // 게시글에 포함될 새 이미지 파일을 S3에 업로드하고 DB에 저장
             List<MultipartFile> fileList = (files != null) ? Arrays.asList(files) : Collections.emptyList();
-            boardService.createBoard(existingBoard, fileList);
+
 
             // 게시글 정보 저장
-            boardService.updateBoard(existingBoard, deletedImageUrls);
+            boardService.updateBoard(existingBoard,  fileList , deletedImageUrls);
+
 
             return ResponseEntity.ok().body("게시글이 성공적으로 수정되었습니다.");
         } else {

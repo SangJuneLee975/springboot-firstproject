@@ -57,7 +57,13 @@ public class BoardServiceImpl implements BoardService {
     // 모든 게시판 조회
     @Override
     public List<Board> getAllBoards() {
-        return jdbcTemplate.query("SELECT * FROM boards", new RowMapper<Board>() {
+        String sql = "SELECT b.id, b.title, b.content, b.writer, b.date, b.category_id, " +
+                "CASE WHEN COUNT(i.id) > 0 THEN 1 ELSE 0 END AS hasImage " +
+                "FROM boards b " +
+                "LEFT JOIN images i ON b.id = i.board_id " +
+                "GROUP BY b.id, b.title, b.content, b.writer, b.date, b.category_id";
+
+        return jdbcTemplate.query(sql, new RowMapper<Board>() {
             @Override
             public Board mapRow(ResultSet rs, int rowNum) throws SQLException {
                 Board board = new Board();
@@ -67,14 +73,32 @@ public class BoardServiceImpl implements BoardService {
                 board.setWriter(rs.getString("writer"));
                 board.setDate(rs.getTimestamp("date").toLocalDateTime());
                 board.setCategoryId(rs.getLong("category_id"));
-
-                //  이미지 URL 목록 조회
-                List<String> imageUrls = imageRepository.findImageUrlsByBoardId(board.getId());
-                board.setImageUrls(imageUrls);
+                board.setHasImage(rs.getInt("hasImage") == 1); // 이미지가 있는지 없는지에 따라 true 또는 false 설정
                 return board;
             }
         });
     }
+
+//    @Override
+//    public List<Board> getAllBoards() {
+//        return jdbcTemplate.query("SELECT * FROM boards", new RowMapper<Board>() {
+//            @Override
+//            public Board mapRow(ResultSet rs, int rowNum) throws SQLException {
+//                Board board = new Board();
+//                board.setId(rs.getLong("id"));
+//                board.setTitle(rs.getString("title"));
+//                board.setContent(rs.getString("content"));
+//                board.setWriter(rs.getString("writer"));
+//                board.setDate(rs.getTimestamp("date").toLocalDateTime());
+//                board.setCategoryId(rs.getLong("category_id"));
+//
+//                //  이미지 URL 목록 조회
+//                List<String> imageUrls = imageRepository.findImageUrlsByBoardId(board.getId());
+//                board.setImageUrls(imageUrls);
+//                return board;
+//            }
+//        });
+//    }
 
 
     // 게시판 상세 조회
@@ -143,10 +167,33 @@ public class BoardServiceImpl implements BoardService {
 
     // 게시판 수정
     @Override
-    public void updateBoard(Board board, List<String> deletedImageUrls) throws JsonProcessingException {
+    public void updateBoard(Board board, List<MultipartFile> multipartFiles, List<String> deletedImageUrls) throws IOException {
+        // 게시글 정보 업데이트
         String sqlUpdateBoard = "UPDATE boards SET title = ?, content = ?, category_id = ? WHERE id = ?";
         jdbcTemplate.update(sqlUpdateBoard, board.getTitle(), board.getContent(), board.getCategoryId(), board.getId());
 
+        // 새로운 이미지 파일 업로드 및 DB에 저장
+        if (multipartFiles != null) {
+            for (MultipartFile file : multipartFiles) {
+                if (!file.isEmpty()) {
+                    // AWS S3에 파일 업로드
+                    String imageUrl = awsS3Service.uploadFileToS3(file);
+                    // 업로드된 이미지 정보를 DB에 저장
+                    Image image = new Image(null, imageUrl, board.getId());
+                    imageRepository.save(image);
+                }
+            }
+        }
+
+        // 요청받은 삭제할 이미지 URL을 이용하여 AWS S3와 DB에서 이미지 삭제
+        if (deletedImageUrls != null) {
+            for (String imageUrl : deletedImageUrls) {
+                // AWS S3에서 이미지 파일 삭제
+                awsS3Service.deleteFileFromS3(imageUrl);
+                // DB에서 이미지 정보 삭제
+                imageRepository.deleteByImageUrl(imageUrl);
+            }
+        }
     }
 
 

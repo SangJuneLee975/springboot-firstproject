@@ -16,7 +16,8 @@ public interface BoardService {
 
  // 이미지 파일을 포함하여 게시판을 생성하는 메서드
  public Board createBoard(Board board, List<MultipartFile> multipartFiles) throws IOException;
- public void updateBoard(Board board, List<String> deletedImageUrls) throws JsonProcessingException ; //게시판 수정
+
+ public  void updateBoard(Board board, List<MultipartFile> multipartFiles, List<String> deletedImageUrls) throws IOException;//게시판 수정
  public void deleteBoard(Long id); //게시판 삭제
 
  public Page<Board> getBoardsPaged(int page, int size);

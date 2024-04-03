@@ -10,6 +10,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
@@ -18,8 +19,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.example.apitest.util.JsonUtil;
 import java.sql.*;
 import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 import com.example.apitest.DTO.Board;
 import org.springframework.jdbc.core.RowMapper;
@@ -46,6 +46,14 @@ public class JdbcBoardRepository implements BoardRepository {
         return jdbcTemplate.query(sql, new BeanPropertyRowMapper<>(Board.class));
     }
 
+
+//    @Override
+//    public List<Board> findAll() {
+//        String sql = "SELECT * FROM boards";
+//        return jdbcTemplate.query(sql, new BeanPropertyRowMapper<>(Board.class));
+//    }
+
+
     @Override
     public Board findById(Long id) {
         String sql = "SELECT * FROM boards WHERE id = ?";
@@ -66,8 +74,8 @@ public class JdbcBoardRepository implements BoardRepository {
 
     @Override
     public void update(Board board) {
-        String sql = "UPDATE boards SET title = ?, content = ? WHERE id = ?";
-        jdbcTemplate.update(sql, board.getTitle(), board.getContent(), board.getId());
+        String sql = "UPDATE boards SET title = ?, content = ?, category_id = ? WHERE id = ?";
+        jdbcTemplate.update(sql, board.getTitle(), board.getContent(), board.getCategoryId(), board.getId());
     }
 
     @Override
